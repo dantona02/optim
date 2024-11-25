@@ -95,7 +95,7 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_
     sim_params = load_params(config_file)
 
     # create BMCTool object and run simulation
-    sim = FID(sim_params, seq_file, adc_time, **kwargs)
+    sim = FID(adc_time, sim_params, seq_file, **kwargs)
     sim.run_fid()
     
 

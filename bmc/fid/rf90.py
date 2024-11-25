@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np
-import tqdm
+from tqdm import tqdm
 from typing import Tuple, Union
 from bmc.bmc_tool import BMCTool
 from bmc.bmc_tool import prep_rf_simulation
@@ -17,6 +17,14 @@ class FID(BMCTool):
             readout duration in seconds
         """
         self.adc_time = adc_time
+        self.defs["num_meas"] = self.params.options["max_pulse_samples"]
+
+        if "num_meas" in self.defs:
+            self.n_measure = int(self.defs["num_meas"]) #redefining n_measure to max_pulse_samples
+        else:
+            self.n_measure = self.n_offsets
+            
+        self.m_out = np.zeros([self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
     
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
 
@@ -25,6 +33,7 @@ class FID(BMCTool):
             dt = self.adc_time / self.params.options["max_pulse_samples"]
             for step in range(self.params.options["max_pulse_samples"]):
                 self.m_out[:, current_adc] = np.squeeze(mag)
+                
                 accum_phase = 0
                 current_adc += 1
 
@@ -82,3 +91,5 @@ class FID(BMCTool):
             for block_event in loop_block_events:
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
+
+    
