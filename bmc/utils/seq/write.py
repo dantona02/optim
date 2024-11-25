@@ -125,7 +125,7 @@ def write_seq_defs(seq: Sequence, seq_defs: dict, use_matlab_names: bool) -> Seq
         # convert value types
         if type(v) == np.ndarray:
             pass
-        elif type(v) in [int, float, np.float32, np.float64, np.float]:
+        elif type(v) in [int, float, np.float32, np.float64, float]:
             v = str(round_number(v, 9))
         else:
             v = str(v)
