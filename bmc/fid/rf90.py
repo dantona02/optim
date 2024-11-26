@@ -15,6 +15,12 @@ class FID(BMCTool):
         ----------
         adc_time: np.float64
             readout duration in seconds
+        params : Params
+            Params object containing all simulation parameters
+        seq_file : Union[str, Path]
+            Path to the seq-file
+        verbose : bool, optional
+            Flag to activate detailed outpus, by default True
         """
         self.adc_time = adc_time
         self.defs["num_meas"] = self.params.options["max_pulse_samples"]
@@ -39,19 +45,22 @@ class FID(BMCTool):
                 accum_phase = 0
                 current_adc += 1
 
-                self.bm_solver.update_matrix(0, 0, 0)
+                self.bm_solver.update_matrix(0, 0, 0) #no rf_amp, no rf_phase, no rf_freq
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt)
             
             # RF pulse
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
+            
             for i in range(amp_.size):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
                     rf_freq=block.rf.freq_offset,
                 )
+                print(np.squeeze(mag))
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                
 
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
@@ -103,7 +112,20 @@ class FID(BMCTool):
             m_z = self.m_out[self.params.mz_loc, :]
             return t, np.abs(m_z)
         else:
-            m_trans_x = self.m_out[0, :]
+            m_trans_c = self.m_out[0, :] + 1j * self.m_out[2, :]
 
-            return t, m_trans_x
+            return t, m_trans_c
+        
+    def get_magtrans_pool(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        """
+        t = np.arange(0, self.adc_time, self.dt)
+
+        if return_zmag:
+            m_z = self.m_out[self.params.mz_loc, :]
+            return t, np.abs(m_z)
+        else:
+            m_trans_c = self.m_out[1, :] + 1j * self.m_out[3, :]
+
+            return t, m_trans_c
     

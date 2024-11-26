@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 24-Nov-2024 14:43:55
+# Created at: 26-Nov-2024 16:33:21
 
 [VERSION]
 major 1
@@ -35,7 +35,7 @@ seq_id_string simple_gauss
 # id amplitude mag_id phase_id time_shape_id delay freq phase
 # ..        Hz   ....     ....          ....    us   Hz   rad
 [RF]
-1      277.778 1 2 0 0 723.799 0
+1      277.778 1 2 0 0 0 0.174533
 
 # Format of ADC events:
 # id num dwell delay freq phase
@@ -3637,4 +3637,4 @@ num_samples 3600
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash decccbff3317a7a8c741c1ac24d8e356
+Hash 94c86c2cca2598dbf115e7475c62d2ec

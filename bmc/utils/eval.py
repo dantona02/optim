@@ -193,10 +193,13 @@ def plot_fid( # plot FID for FID class
         time = range(len(m_out))
 
     fig, ax1 = plt.subplots()
-    ax1.set_ylim([round(min(m_out) - 0.05, 2), round(max(m_out) + 0.05, 2)])
+    #ax1.set_ylim([round(min(np.abs(m_out)) - 0.05, 2), round(max(np.abs(m_out)) + 0.05, 2)])
     ax1.set_ylabel(y_label, color="b")
     ax1.set_xlabel(x_label)
-    plt.plot(time, m_out, ".--", label="$x$", color="b")
+ 
+    plt.plot(time, np.abs(m_out), ".--", label="$x$", color="b")
+    plt.plot(time, np.angle(m_out), ".--", label="$x$", color="r")
+
     ax1.tick_params(axis="y", labelcolor="b")
     ax1.axvline(0, color='black', linestyle='--')
     ax1.axhline(0, color='black', linestyle='--')
