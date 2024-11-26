@@ -25,12 +25,14 @@ class FID(BMCTool):
             self.n_measure = self.n_offsets
             
         self.m_out = np.zeros([self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
-    
+        self.dt = self.adc_time / self.params.options["max_pulse_samples"]
+
+
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
 
         #adc with time dt and max_pulse_sampels
         if block.adc is not None:
-            dt = self.adc_time / self.params.options["max_pulse_samples"]
+            
             for step in range(self.params.options["max_pulse_samples"]):
                 self.m_out[:, current_adc] = np.squeeze(mag)
                 
@@ -38,7 +40,7 @@ class FID(BMCTool):
                 current_adc += 1
 
                 self.bm_solver.update_matrix(0, 0, 0)
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=dt)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt)
             
             # RF pulse
         elif block.rf is not None:
@@ -92,4 +94,16 @@ class FID(BMCTool):
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
 
+    def get_magtrans(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        """
+        t = np.arange(0, self.adc_time, self.dt)
+
+        if return_zmag:
+            m_z = self.m_out[self.params.mz_loc, :]
+            return t, np.abs(m_z)
+        else:
+            m_trans_x = self.m_out[0, :]
+
+            return t, m_trans_x
     

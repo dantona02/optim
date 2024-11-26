@@ -10,7 +10,7 @@ import numpy as np
 from bmc.bmc_tool import BMCTool
 from bmc.fid.rf90 import FID
 from bmc.set_params import load_params
-from bmc.utils.eval import plot_z
+from bmc.utils.eval import plot_z, plot_fid
 
 
 def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plot: bool = False, **kwargs) -> BMCTool:
@@ -100,13 +100,10 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_
     
 
     if show_plot:
-        if "offsets" in kwargs:
-            offsets = kwargs.pop("offsets")
-            _, m_z = sim.get_zspec()
-        else:
-            offsets, m_z = sim.get_zspec()
 
-        plot_z(m_z=m_z, offsets=offsets, **kwargs)
+        time, m_trans = sim.get_magtrans()
+
+        plot_fid(m_out=m_trans, time=time, **kwargs)
 
     return sim
 

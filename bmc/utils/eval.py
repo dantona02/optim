@@ -180,3 +180,28 @@ def plot_z(
     plt.show()
 
     return fig
+
+
+def plot_fid( # plot FID for FID class
+    m_out: np.ndarray, 
+    time: Union[np.ndarray, None] = None,
+    title: str = "FID", 
+    x_label: str = "ADC time [s]", 
+    y_label: str = "signal") -> Figure:
+
+    if time is None:
+        time = range(len(m_out))
+
+    fig, ax1 = plt.subplots()
+    ax1.set_ylim([round(min(m_out) - 0.05, 2), round(max(m_out) + 0.05, 2)])
+    ax1.set_ylabel(y_label, color="b")
+    ax1.set_xlabel(x_label)
+    plt.plot(time, m_out, ".--", label="$x$", color="b")
+    ax1.tick_params(axis="y", labelcolor="b")
+    ax1.axvline(0, color='black', linestyle='--')
+    ax1.axhline(0, color='black', linestyle='--')
+
+    plt.title(title)
+    plt.show()
+
+    return fig
