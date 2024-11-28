@@ -58,7 +58,7 @@ class FID(BMCTool):
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
                     rf_freq=block.rf.freq_offset,
                 )
-                print(np.squeeze(mag))
+                # print(np.squeeze(mag))
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                 
 
@@ -105,27 +105,31 @@ class FID(BMCTool):
 
     def get_magtrans(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """
+        Rturns the complex transverse magnetization. No implementation for MT pools.
         """
+
         t = np.arange(0, self.adc_time, self.dt)
 
         if return_zmag:
             m_z = self.m_out[self.params.mz_loc, :]
             return t, np.abs(m_z)
+        elif self.params.cest_pools:
+            n_total_pools = len(self.params.cest_pools) + 1
+            m_trans_c = self.m_out[0, :] + 1j * self.m_out[n_total_pools, :]
         else:
-            m_trans_c = self.m_out[0, :] + 1j * self.m_out[2, :]
-
+            m_trans_c = self.m_out[0, :] + 1j * self.m_out[1, :]
             return t, m_trans_c
         
-    def get_magtrans_pool(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        """
-        t = np.arange(0, self.adc_time, self.dt)
+    # def get_magtrans_pool(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    #     """
+    #     """
+    #     t = np.arange(0, self.adc_time, self.dt)
 
-        if return_zmag:
-            m_z = self.m_out[self.params.mz_loc, :]
-            return t, np.abs(m_z)
-        else:
-            m_trans_c = self.m_out[1, :] + 1j * self.m_out[3, :]
+    #     if return_zmag:
+    #         m_z = self.m_out[self.params.mz_loc, :]
+    #         return t, np.abs(m_z)
+    #     else:
+    #         m_trans_c = self.m_out[1, :] + 1j * self.m_out[3, :]
 
-            return t, m_trans_c
+    #         return t, m_trans_c
     
