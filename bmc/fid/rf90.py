@@ -103,33 +103,35 @@ class FID(BMCTool):
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
 
-    def get_magtrans(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    def get_magtrans(self, return_zmag: bool = False, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Rturns the complex transverse magnetization. No implementation for MT pools.
+        Rturns the complex transverse magnetization of water pool or one cest pool. No implementation for MT pools.
+        If return_cest_pool is True, only returns magnetization of the first cest pool.
+        ----------
+        Parameters
+        ----------
+        return_zmag: bool, optional
+            If True, returns z-magnetization
+        return_cest_pool: bool, optional
+            If True, returns magnetization of the first cest pool
         """
 
         t = np.arange(0, self.adc_time, self.dt)
-
-        if return_zmag:
-            m_z = self.m_out[self.params.mz_loc, :]
-            return t, np.abs(m_z)
-        elif self.params.cest_pools:
-            n_total_pools = len(self.params.cest_pools) + 1
-            m_trans_c = self.m_out[0, :] + 1j * self.m_out[n_total_pools, :]
+        if return_cest_pool and self.params.cest_pools:
+            if return_zmag:
+                m_z = self.m_out[self.params.mz_loc + 1, :]
+                return t, np.abs(m_z)
+            else:
+                n_total_pools = len(self.params.cest_pools) + 1
+                m_trans_c = self.m_out[1, :] + 1j * self.m_out[n_total_pools + 1, :]
         else:
-            m_trans_c = self.m_out[0, :] + 1j * self.m_out[1, :]
-            return t, m_trans_c
-        
-    # def get_magtrans_pool(self, return_zmag: bool = False) -> Tuple[np.ndarray, np.ndarray]:
-    #     """
-    #     """
-    #     t = np.arange(0, self.adc_time, self.dt)
-
-    #     if return_zmag:
-    #         m_z = self.m_out[self.params.mz_loc, :]
-    #         return t, np.abs(m_z)
-    #     else:
-    #         m_trans_c = self.m_out[1, :] + 1j * self.m_out[3, :]
-
-    #         return t, m_trans_c
+            if return_zmag:
+                m_z = self.m_out[self.params.mz_loc, :]
+                return t, m_z
+            elif self.params.cest_pools:
+                n_total_pools = len(self.params.cest_pools) + 1
+                m_trans_c = self.m_out[0, :] + 1j * self.m_out[n_total_pools, :]
+            else:
+                m_trans_c = self.m_out[0, :] + 1j * self.m_out[1, :]
+                return t, m_trans_c
     

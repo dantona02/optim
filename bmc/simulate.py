@@ -101,9 +101,9 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_
 
     if show_plot:
 
-        time, m_trans = sim.get_magtrans()
+        time, mag = sim.get_magtrans()
 
-        plot_fid(m_out=m_trans, time=time, **kwargs)
+        plot_fid(m_out=mag, time=time, **kwargs)
 
     return sim
 
