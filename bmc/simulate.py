@@ -12,6 +12,10 @@ from bmc.fid.rf90 import FID
 from bmc.set_params import load_params
 from bmc.utils.eval import plot_z, plot_fid
 
+import os
+import subprocess
+import json
+
 
 def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plot: bool = False, **kwargs) -> BMCTool:
     """
@@ -101,7 +105,7 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_
 
     if show_plot:
 
-        time, mag = sim.get_magtrans()
+        time, mag = sim.get_mag()
 
         plot_fid(m_out=mag, time=time, **kwargs)
 

@@ -1,10 +1,16 @@
 from pathlib import Path
 import numpy as np
 from tqdm import tqdm
+import subprocess
+import json
+
 from typing import Tuple, Union
 from bmc.bmc_tool import BMCTool
 from bmc.bmc_tool import prep_rf_simulation
 from bmc.params import Params
+from IPython import get_ipython
+from manim import *
+from manim.opengl import *
 
 
 class FID(BMCTool):
@@ -103,9 +109,9 @@ class FID(BMCTool):
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
 
-    def get_magtrans(self, return_zmag: bool = False, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    def get_mag(self, return_zmag: bool = False, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Rturns the complex transverse magnetization of water pool or one cest pool. No implementation for MT pools.
+        Rturns the complex transverse magnetization of water pool or ONE cest pool. No implementation for MT pools.
         If return_cest_pool is True, only returns magnetization of the first cest pool.
         ----------
         Parameters
@@ -117,6 +123,7 @@ class FID(BMCTool):
         """
 
         t = np.arange(0, self.adc_time, self.dt)
+
         if return_cest_pool and self.params.cest_pools:
             if return_zmag:
                 m_z = self.m_out[self.params.mz_loc + 1, :]
@@ -124,6 +131,7 @@ class FID(BMCTool):
             else:
                 n_total_pools = len(self.params.cest_pools) + 1
                 m_trans_c = self.m_out[1, :] + 1j * self.m_out[n_total_pools + 1, :]
+                return t, m_trans_c
         else:
             if return_zmag:
                 m_z = self.m_out[self.params.mz_loc, :]
@@ -131,7 +139,113 @@ class FID(BMCTool):
             elif self.params.cest_pools:
                 n_total_pools = len(self.params.cest_pools) + 1
                 m_trans_c = self.m_out[0, :] + 1j * self.m_out[n_total_pools, :]
+                return t, m_trans_c
             else:
                 m_trans_c = self.m_out[0, :] + 1j * self.m_out[1, :]
                 return t, m_trans_c
     
+    def animate(self, step: int = 1, run_time = 0.1, track_path=False, ie=False, **addParams) -> None:
+        """
+        Animates the magnetization vector in a 3D plot.
+        ----------
+        Parameters
+        ----------
+        step: int, optional
+            Step size for animation, by default 1
+        run_time: float, optional
+            Duration of each animation step, by default 0.1
+        track_path: bool, optional
+            Flag to activate path tracking, by default False
+        ie: bool, optional
+            Flag to activate interactive embedding, by default False. Jupyter kernel must be restarted after using this flag.
+        """
+   
+        if self.params.cest_pools:
+            n_total_pools = len(self.params.cest_pools) + 1
+            m_vec_water = np.stack(
+                (self.m_out[0, :],
+                 self.m_out[n_total_pools, :],
+                 self.m_out[self.params.mz_loc, :]),
+                 axis=1) #stack x,y,z magnetization to [[x1,y1,z1],[x2,y2,z2],...
+            m_vec_cest = np.stack(
+                (self.m_out[1, :],
+                 self.m_out[n_total_pools + 1, :],
+                 self.m_out[self.params.mz_loc + 1, :]),
+                 axis=1)
+
+        else:
+            m_vec_water = np.stack(
+                (self.m_out[0, :],
+                 self.m_out[1, :],
+                 self.m_out[self.params.mz_loc, :]),
+                 axis=1)
+        
+        m_vec_water = m_vec_water[::step]#.tolist()
+        mag_vector = m_vec_water
+        render_params = {
+            'quality': '-ql',
+            'write': '',
+        }
+        render_params.update(addParams)
+        
+        class Vector3DScene(ThreeDScene):
+            def construct(self):
+
+                if mag_vector is None:
+                    raise ValueError("No magnetization data available.")
+
+                axes = ThreeDAxes(
+                x_range=(-1.4, 1.4, .2),
+                y_range=(-1.4, 1.4, .2),
+                z_range=(-1.4, 1.4, .2)
+                )
+                scale_factor_xy = axes.x_length / (axes.x_range[1] - axes.x_range[0])
+                scale_factor_z = axes.z_length / (axes.z_range[1] - axes.z_range[0])
+                scaling_array = np.array([scale_factor_xy, scale_factor_xy, scale_factor_z])
+
+                labels = axes.get_axis_labels(Text("x").scale(.7), Text("y").scale(.7), Text("z").scale(.7))
+
+                #vector initialization
+                vector = Vector(
+                    mag_vector[0] * scaling_array,
+                    color=RED
+                )
+                
+                x_tracker = ValueTracker(mag_vector[0][0] * scaling_array[0])
+                y_tracker = ValueTracker(mag_vector[0][1] * scaling_array[1])
+                z_tracker = ValueTracker(mag_vector[0][2] * scaling_array[2])
+
+                def update_vector(v):
+                    new_vector = Vector([x_tracker.get_value(), 
+                                        y_tracker.get_value(), 
+                                        z_tracker.get_value()], 
+                                        color=RED)
+                    v.become(new_vector)
+
+                vector.add_updater(update_vector)
+
+                path = TracedPath(vector.get_end, stroke_color=RED, stroke_width=1)
+                self.add(axes, labels, vector)
+                if track_path:
+                    self.add(path)
+
+                self.set_camera_orientation(phi=65 * DEGREES, theta=135 * DEGREES)
+                
+                self.wait(0.5)
+
+                for pos in mag_vector[1:]:
+                    self.play(
+                        x_tracker.animate.set_value(pos[0] * scaling_array[0]),
+                        y_tracker.animate.set_value(pos[1] * scaling_array[1]),
+                        z_tracker.animate.set_value(pos[2] * scaling_array[2]),
+                        run_time=run_time, rate_func=linear)
+                
+                if ie:
+                    self.interactive_embed()
+                
+        ipython = get_ipython()
+        if ipython:
+            ipython.run_line_magic('manim', f'-v WARNING {render_params["quality"]} --disable_caching --renderer=opengl {render_params["write"]} Vector3DScene')
+        else:
+            print("Magic commands are not supported outside Jupyter notebooks.")
+        
