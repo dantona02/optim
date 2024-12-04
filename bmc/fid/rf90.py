@@ -76,6 +76,13 @@ class FID(BMCTool):
             phase_degree %= 360
             accum_phase += phase_degree / 180 * np.pi
 
+        elif block.gz is not None:
+            dur_ = block.block_duration
+            self.bm_solver.update_matrix(0, 0, 0)
+            mag = self.bm_solver.solve_equation(mag=mag, dtp=dur_)
+            for j in range((len(self.params.cest_pools) + 1) * 2):
+                mag[0, j, 0] = 0.0  # assume complete spoiling
+
         return current_adc, accum_phase, mag
 
     def run_fid(self) -> None:
