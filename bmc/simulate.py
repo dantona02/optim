@@ -12,9 +12,6 @@ from bmc.fid.rf90 import FID
 from bmc.set_params import load_params
 from bmc.utils.eval import plot_z, plot_fid
 
-import os
-import subprocess
-import json
 
 
 def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plot: bool = False, **kwargs) -> BMCTool:
