@@ -74,6 +74,60 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
 
     return amp_, ph_, dtp_, delay_after_pulse
 
+def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[np.ndarray, float, float]:
+    """
+    prep_rf_simulation Resamples the amplitude and phase of given rf event.
+
+    Parameters
+    ----------
+    block : SimpleNamespace
+        PyPulseq block event
+    max_pulse_samples : int
+        Maximum number of samples for the rf pulse
+
+    Returns
+    -------
+    Tuple[np.ndarray, float, float]
+        Tuple of resampled amplitude, phase, time step and delay after pulse
+
+    Raises
+    ------
+    Exception
+        If number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet)
+    """
+    amp = np.abs(block.gz.waveform)
+    idx = np.argwhere(amp > 1e-6)
+
+    try:
+        grad_length = amp.size
+        dtp = block.gz.tt[1] - block.gz.tt[0]
+        delay_after_grad = (grad_length - idx.size) * dtp
+    except AttributeError:
+        grad_length = amp.size
+        dtp = 1e-6
+        delay_after_grad = (grad_length - idx.size) * dtp
+
+    amp = amp[idx]
+    n_unique = np.unique(amp).size #changed from max to np.unique
+
+    # block pulse for seq-files >= 1.4.0
+    if n_unique == 1 and amp.size ==2:
+        amp_ = amp[0]
+        dtp_ = dtp
+    # block pulse for seq-files < 1.4.0
+    elif n_unique == 1:
+        amp_ = amp[0]
+        dtp_ = dtp * amp.size
+    # shaped pulse
+    elif n_unique > max_pulse_samples:
+        sample_factor = int(np.ceil(amp.size / max_pulse_samples))
+        amp_ = amp[::sample_factor]
+        dtp_ = dtp * sample_factor
+    else:
+        raise Exception("Case with 1 < unique samples < max_pulse_samples not implemented yet. Sorry :(")
+
+    return amp_, dtp_, delay_after_grad
+
 
 class BMCTool:
     """

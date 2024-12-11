@@ -125,7 +125,7 @@ class BlochMcConnellSolver:
         self._init_matrix_a()
         self._init_vector_c()
 
-    def update_matrix(self, rf_amp: float, rf_phase: np.ndarray, rf_freq: np.ndarray) -> None:
+    def update_matrix(self, rf_amp: float, rf_phase: np.ndarray, rf_freq: np.ndarray, grad_amp: float = 0) -> None:
         """
         Updates matrix self.A according to given parameters.
         :param rf_amp: amplitude of current step (e.g. pulse fragment)
@@ -138,6 +138,10 @@ class BlochMcConnellSolver:
         # set dw0 due to b0_inhomogeneity
         self.arr_a[:, 0, 1 + n_p] = [self.dw0] * j
         self.arr_a[:, 1 + n_p, 0] = [-1 * self.dw0] * j
+
+        #set dw_grad for water pool
+        self.arr_a[:, 0, 1 + n_p] += 2 * np.pi * grad_amp * 1e-6
+        self.arr_a[:, 1 + n_p, 0] -= 2 * np.pi * grad_amp * 1e-6
 
         # calculate omega_1
         rf_amp_2pi = rf_amp * 2 * np.pi * self.params.scanner["rel_b1"]
@@ -159,10 +163,12 @@ class BlochMcConnellSolver:
             self.arr_a[:, n_p + 1 + i, i + 2 * (n_p + 1)] = rf_amp_2pi_cos
             self.arr_a[:, i + 2 * (n_p + 1), n_p + 1 + i] = -rf_amp_2pi_cos
 
-        # set off-resonance terms for water pool
+        # set off-resonance terms for water pool, rf_freq is frequency offset from water
         rf_freq_2pi = rf_freq * 2 * np.pi
         self.arr_a[:, 0, 1 + n_p] += rf_freq_2pi
         self.arr_a[:, 1 + n_p, 0] -= rf_freq_2pi
+
+        
 
         # set off-resonance terms for cest pools
         for i in range(1, n_p + 1):
@@ -170,12 +176,15 @@ class BlochMcConnellSolver:
             self.arr_a[:, i, i + n_p + 1] = -dwi
             self.arr_a[:, i + n_p + 1, i] = dwi
 
+            self.arr_a[:, i, i + n_p + 1] -= 2 * np.pi * grad_amp * 1e-5
+            self.arr_a[:, i + n_p + 1, i] += 2 * np.pi * grad_amp * 1e-5
+
         # mt_pool
         if self.is_mt_active:
             self.arr_a[:, 3 * (n_p + 1), 3 * (n_p + 1)] = (
                 -self.params.mt_pool["r1"]
                 - self.params.mt_pool["k"]
-                - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0)
+                - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0) # implementation of gradient needs to be implemented
             )
 
     def solve_equation(self, mag: np.ndarray, dtp: float) -> np.ndarray:

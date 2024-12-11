@@ -6,7 +6,7 @@ import json
 
 from typing import Tuple, Union
 from bmc.bmc_tool import BMCTool
-from bmc.bmc_tool import prep_rf_simulation
+from bmc.bmc_tool import prep_rf_simulation, prep_grad_simulation
 from bmc.params import Params
 from IPython import get_ipython
 from manim import *
@@ -29,7 +29,7 @@ class FID(BMCTool):
             Flag to activate detailed outpus, by default True
         """
         self.adc_time = adc_time
-        self.defs["num_meas"] = self.params.options["max_pulse_samples"]
+        self.defs["num_meas"] = self.params.options["max_pulse_samples"] * len(self.seq.block_events)
 
         if "num_meas" in self.defs:
             self.n_measure = int(self.defs["num_meas"]) #redefining n_measure to max_pulse_samples
@@ -37,7 +37,7 @@ class FID(BMCTool):
             self.n_measure = self.n_offsets
             
         self.m_out = np.zeros([self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
-        self.dt = self.adc_time / self.params.options["max_pulse_samples"]
+        self.dt = self.adc_time / self.defs["num_meas"]
 
 
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
@@ -59,29 +59,53 @@ class FID(BMCTool):
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
             
             for i in range(amp_.size):
+
+                self.m_out[:, current_adc] = np.squeeze(mag)
+                current_adc += 1
+
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
                     rf_freq=block.rf.freq_offset,
                 )
                 # print(np.squeeze(mag))
+
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                 
 
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
+                self.m_out[:, current_adc] = np.squeeze(mag)
+                current_adc += 1
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
             phase_degree = dtp_ * amp_.size * 360 * block.rf.freq_offset
             phase_degree %= 360
             accum_phase += phase_degree / 180 * np.pi
-
+            
         elif block.gz is not None:
-            dur_ = block.block_duration
-            self.bm_solver.update_matrix(0, 0, 0)
-            mag = self.bm_solver.solve_equation(mag=mag, dtp=dur_)
-            for j in range((len(self.params.cest_pools) + 1) * 2):
-                mag[0, j, 0] = 0.0  # assume complete spoiling
+            amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
+            
+            for i in range(amp_.size):
+
+                self.m_out[:, current_adc] = np.squeeze(mag)
+                current_adc += 1
+
+                self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                
+            if delay_after_grad > 0:
+                self.bm_solver.update_matrix(0, 0, 0)
+                self.m_out[:, current_adc] = np.squeeze(mag)
+                current_adc += 1
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
+
+        # elif block.gz is not None:
+        #     dur_ = block.block_duration
+        #     self.bm_solver.update_matrix(0, 0, 0)
+        #     mag = self.bm_solver.solve_equation(mag=mag, dtp=dur_)
+        #     for j in range((len(self.params.cest_pools) + 1) * 2):
+        #         mag[0, j, 0] = 0.0  # assume complete spoiling
 
         return current_adc, accum_phase, mag
 
