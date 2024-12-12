@@ -185,9 +185,11 @@ def plot_z(
 def plot_fid( # plot FID for FID class
     m_out: np.ndarray, 
     time: Union[np.ndarray, None] = None,
+    plt_range : list = None,
     title: str = "FID", 
     x_label: str = "ADC time [s]", 
     y_label: str = "signal") -> Figure:
+    
 
     if time is None:
         time = range(len(m_out))
@@ -196,6 +198,7 @@ def plot_fid( # plot FID for FID class
     #ax1.set_ylim([round(min(np.abs(m_out)) - 0.05, 2), round(max(np.abs(m_out)) + 0.05, 2)])
     ax1.set_ylabel(y_label, color="b")
     ax1.set_xlabel(x_label)
+    ax1.set_xlim(plt_range)
  
     plt.plot(time, np.abs(m_out), ".--", label="$x$", color="b")
     plt.plot(time, np.angle(m_out), ".--", label="$x$", color="r")

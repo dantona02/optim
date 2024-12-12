@@ -63,7 +63,7 @@ def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plo
     return sim
 
 
-def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_time: np.float64, show_plot: bool = False, **kwargs) -> FID:
+def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_time: np.float64, show_plot: bool = False, plt_range: list = [0, 5], **kwargs) -> FID:
     """
     simulate Run BMCTool simulation based on given seq-file and config file.
 
@@ -104,7 +104,7 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_
 
         time, mag = sim.get_mag()
 
-        plot_fid(m_out=mag, time=time, **kwargs)
+        plot_fid(m_out=mag, time=time, plt_range=plt_range, **kwargs)
 
     return sim
 
