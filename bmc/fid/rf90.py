@@ -191,7 +191,7 @@ class FID(BMCTool):
     def get_time(self) -> np.ndarray:
         return self.t
     
-    def animate(self, step: int = 1, run_time = 0.1, track_path=False, ie=False, **addParams) -> None:
+    def animate(self, step: int = 1, run_time = 0.1, track_path=False, ie=False, timing=False, **addParams) -> None:
         """
         Animates the magnetization vector in a 3D plot.
         ----------
@@ -206,7 +206,9 @@ class FID(BMCTool):
         ie: bool, optional
             Flag to activate interactive embedding, by default False. Jupyter kernel must be restarted after using this flag.
         """
-   
+
+        time = self.t
+
         if self.params.cest_pools:
             n_total_pools = len(self.params.cest_pools) + 1
             m_vec_water = np.stack(
@@ -246,6 +248,27 @@ class FID(BMCTool):
                 y_range=(-1.4, 1.4, .2),
                 z_range=(-1.4, 1.4, .2)
                 )
+
+                decimal = Text("0", font_size=36)
+
+                time_tracker = ValueTracker(0)
+
+                def update_decimal(d):
+                    # Finden Sie den aktuellen Index basierend auf der Animation
+                    current_index = int(time_tracker.get_value())
+                    # Verwenden Sie den Wert aus dem Array
+                    current_time = time[current_index] if current_index < len(time) else time[-1]
+                    
+                    d.become(Text(f"t = {current_time:.4f} s", font_size=36))
+                    d.fix_in_frame()
+                    d.to_corner(UR).scale(0.7)
+
+                # Text als OpenGL-kompatibles Objekt initialisieren
+                if timing:
+                    self.add(decimal)
+                decimal.fix_in_frame()
+                decimal.add_updater(update_decimal)
+
                 scale_factor_xy = axes.x_length / (axes.x_range[1] - axes.x_range[0])
                 scale_factor_z = axes.z_length / (axes.z_range[1] - axes.z_range[0])
                 scaling_array = np.array([scale_factor_xy, scale_factor_xy, scale_factor_z])
@@ -280,11 +303,12 @@ class FID(BMCTool):
                 
                 self.wait(0.5)
 
-                for pos in mag_vector[1:]:
+                for i, pos in enumerate(mag_vector[1:]):
                     self.play(
                         x_tracker.animate.set_value(pos[0] * scaling_array[0]),
                         y_tracker.animate.set_value(pos[1] * scaling_array[1]),
                         z_tracker.animate.set_value(pos[2] * scaling_array[2]),
+                        time_tracker.animate.set_value(i+1),
                         run_time=run_time, rate_func=linear)
                 
                 if ie:
