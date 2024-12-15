@@ -8,7 +8,7 @@ from typing import Union
 import numpy as np
 
 from bmc.bmc_tool import BMCTool
-from bmc.fid.rf90 import FID
+from bmc.fid.sim_engine import BMCSim
 from bmc.set_params import load_params
 from bmc.utils.eval import plot_z, plot_fid
 
@@ -63,7 +63,7 @@ def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plo
     return sim
 
 
-def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_time: np.float64, write_all_mag: bool = False, show_plot: bool = False, plt_range: list = [0, 5], **kwargs) -> FID:
+def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_time: np.float64, write_all_mag: bool = False, show_plot: bool = False, plt_range: list = [0, 5], **kwargs) -> BMCSim:
     """
     simulate Run BMCTool simulation based on given seq-file and config file.
 
@@ -96,7 +96,7 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], adc_
     sim_params = load_params(config_file)
 
     # create BMCTool object and run simulation
-    sim = FID(adc_time, sim_params, seq_file, write_all_mag=write_all_mag, **kwargs)
+    sim = BMCSim(adc_time, sim_params, seq_file, write_all_mag=write_all_mag, **kwargs)
     sim.run_fid()
     
 
