@@ -31,7 +31,6 @@ class FID(BMCTool):
         self.adc_time = adc_time
         self.write_all_mag = write_all_mag
         
-        print(self.write_all_mag)
         if self.write_all_mag:
             self.defs["num_meas"] = self.params.options["max_pulse_samples"] * len(self.seq.block_events)
         else:
@@ -43,7 +42,7 @@ class FID(BMCTool):
             self.n_measure = self.n_offsets
             
         self.m_out = np.zeros([self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
-        self.dt_adc = self.adc_time / self.defs["num_meas"]
+        self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
 
         self.t = np.array([])
 
@@ -53,10 +52,9 @@ class FID(BMCTool):
         if block.adc is not None:
             
             start_time = self.t[-1] if self.t.size > 0 else 0
+            print(f'adc at {start_time:.4f}s')
             time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * self.dt_adc
             self.t = np.append(self.t, time_array)
-            print(self.m_out.shape)
-            print(self.params.options["max_pulse_samples"])
 
             for step in range(self.params.options["max_pulse_samples"]):
                 self.m_out[:, current_adc] = np.squeeze(mag)
@@ -71,10 +69,9 @@ class FID(BMCTool):
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
-            print(delay_after_pulse)
-
             if self.write_all_mag:
                 start_time = self.t[-1] if self.t.size > 0 else 0
+                print(f'rf at {start_time:.4f}s')
                 time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
                 self.t = np.append(self.t, time_array)
 
@@ -92,7 +89,7 @@ class FID(BMCTool):
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                 
 
-            if delay_after_pulse > 0:
+            if delay_after_pulse > 0: #might cause problems if delay_after_pulse is significantly larger than 0
                 self.bm_solver.update_matrix(0, 0, 0)
                 if self.write_all_mag:
                     self.m_out[:, current_adc] = np.squeeze(mag)
@@ -106,10 +103,9 @@ class FID(BMCTool):
         elif block.gz is not None:
             amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
 
-            print(delay_after_grad)
-
             if self.write_all_mag:
                 start_time = self.t[-1] if self.t.size > 0 else 0
+                print(f'gz at {start_time:.4f}s')
                 time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
                 self.t = np.append(self.t, time_array)
 
@@ -331,3 +327,8 @@ class FID(BMCTool):
         else:
             print("Magic commands are not supported outside Jupyter notebooks.")
         
+    def get_time(self) -> np.ndarray:
+        """
+        Returns the time array.
+        """
+        return self.t

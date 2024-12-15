@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 12-Dec-2024 00:46:45
+# Created at: 15-Dec-2024 17:10:43
 
 [VERSION]
 major 1
@@ -19,7 +19,7 @@ FREQ 723.7988
 GradientRasterTime 1e-05 
 M0_offset 0.0 
 RadiofrequencyRasterTime 1e-06 
-TotalDuration 1.011 
+TotalDuration 0.521 
 a 90 
 num_meas 1 
 offsets_ppm 0 
@@ -29,8 +29,9 @@ seq_id_string simple_gauss_gradient
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
 [BLOCKS]
 1 1000   1   0   0   0  0  0
-2 100000   0   0   0   1  0  0
-3 100   0   0   0   0  1  0
+2 50000   0   0   0   1  0  0
+3 1000   1   0   0   0  0  0
+4 100   0   0   0   0  1  0
 
 # Format of RF events:
 # id amplitude mag_id phase_id time_shape_id delay freq phase
@@ -10024,14 +10025,14 @@ num_samples 10000
 9998
 
 shape_id 3
-num_samples 1000000
+num_samples 500000
 0
 0.001
 0.001
 998
 0
 0
-997998
+497998
 -0.001001
 -0.001001
 47
@@ -10077,11 +10078,11 @@ num_samples 1000000
 47
 
 shape_id 4
-num_samples 1000000
+num_samples 500000
 0.05
 0.1
 0.1
-999997
+499997
 
 
 [SIGNATURE]
@@ -10089,4 +10090,4 @@ num_samples 1000000
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 9461759f052b3b9e15911de7a906d10e
+Hash 5c261529ef615cb76aa5b73eb87ef9f0
