@@ -14,7 +14,7 @@ from manim.opengl import *
 
 
 class FID(BMCTool):
-    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, verbose: bool = True, **kwargs) -> None:
+    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, verbose: bool = True, write_all_mag: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         """
         Parameters
@@ -29,7 +29,13 @@ class FID(BMCTool):
             Flag to activate detailed outpus, by default True
         """
         self.adc_time = adc_time
-        self.defs["num_meas"] = self.params.options["max_pulse_samples"] * len(self.seq.block_events)
+        self.write_all_mag = write_all_mag
+        
+        print(self.write_all_mag)
+        if self.write_all_mag:
+            self.defs["num_meas"] = self.params.options["max_pulse_samples"] * len(self.seq.block_events)
+        else:
+            self.defs["num_meas"] = self.params.options["max_pulse_samples"]
 
         if "num_meas" in self.defs:
             self.n_measure = int(self.defs["num_meas"]) #redefining n_measure to max_pulse_samples
@@ -43,14 +49,14 @@ class FID(BMCTool):
 
 
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
-
         #adc with time dt and max_pulse_sampels
         if block.adc is not None:
             
             start_time = self.t[-1] if self.t.size > 0 else 0
             time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * self.dt_adc
             self.t = np.append(self.t, time_array)
-
+            print(self.m_out.shape)
+            print(self.params.options["max_pulse_samples"])
 
             for step in range(self.params.options["max_pulse_samples"]):
                 self.m_out[:, current_adc] = np.squeeze(mag)
@@ -65,29 +71,32 @@ class FID(BMCTool):
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
-            start_time = self.t[-1] if self.t.size > 0 else 0
-            time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
-            self.t = np.append(self.t, time_array)
+            print(delay_after_pulse)
+
+            if self.write_all_mag:
+                start_time = self.t[-1] if self.t.size > 0 else 0
+                time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
+                self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
-
-                self.m_out[:, current_adc] = np.squeeze(mag)
-                current_adc += 1
+                if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
+                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    current_adc += 1
 
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
                     rf_freq=block.rf.freq_offset,
                 )
-                # print(np.squeeze(mag))
 
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                 
 
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
-                self.m_out[:, current_adc] = np.squeeze(mag)
-                current_adc += 1
+                if self.write_all_mag:
+                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    current_adc += 1
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
             phase_degree = dtp_ * amp_.size * 360 * block.rf.freq_offset
@@ -96,23 +105,28 @@ class FID(BMCTool):
             
         elif block.gz is not None:
             amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
-            
-            start_time = self.t[-1] if self.t.size > 0 else 0
-            time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
-            self.t = np.append(self.t, time_array)
+
+            print(delay_after_grad)
+
+            if self.write_all_mag:
+                start_time = self.t[-1] if self.t.size > 0 else 0
+                time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
+                self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
-
-                self.m_out[:, current_adc] = np.squeeze(mag)
-                current_adc += 1
+                
+                if self.write_all_mag:
+                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    current_adc += 1
 
                 self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                 
             if delay_after_grad > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
-                self.m_out[:, current_adc] = np.squeeze(mag)
-                current_adc += 1
+                if self.write_all_mag:
+                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    current_adc += 1
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
 
         # elif block.gz is not None:
@@ -187,9 +201,6 @@ class FID(BMCTool):
             else:
                 m_trans_c = self.m_out[0, :] + 1j * self.m_out[1, :]
                 return self.t, m_trans_c
-    
-    def get_time(self) -> np.ndarray:
-        return self.t
     
     def animate(self, step: int = 1, run_time = 0.1, track_path=False, ie=False, timing=False, **addParams) -> None:
         """
