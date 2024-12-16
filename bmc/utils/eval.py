@@ -186,8 +186,8 @@ def plot_fid( # plot FID for FID class
     m_out: np.ndarray, 
     time: Union[np.ndarray, None] = None,
     plt_range : list = None,
-    title: str = "FID", 
-    x_label: str = "ADC time [s]", 
+    title: str = "Signal/Phase", 
+    x_label: str = "time [s]", 
     y_label: str = "signal") -> Figure:
     
 

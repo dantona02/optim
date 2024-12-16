@@ -40,8 +40,6 @@ class BlochMcConnellSolver:
         self.w0: float = None
         self.dw0: float = None
 
-        print(self.n_isochromats)
-
         self.update_params(params)
 
     def _init_matrix_a(self) -> None:
@@ -198,48 +196,6 @@ class BlochMcConnellSolver:
                 - self.params.mt_pool["k"]
                 - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0) # implementation of gradient needs to be implemented
             )
-
-    # def solve_equation(self, mag: np.ndarray, dtp: float) -> np.ndarray:
-    #     """
-    #     Solves one step of BMC equations using the Padé approximation. This function is not used atm.
-    #     :param mag: magnetization vector before current step
-    #     :param dtp: duration of current step
-    #     :return: magnetization vector after current step
-    #     """
-    #     arr_a = np.squeeze(self.arr_a)
-    #     arr_c = np.squeeze(self.arr_c)
-    #     mag_ = np.squeeze(mag)
-    #     n_iter = 6  # number of iterations
-    #     a_inv_t = np.dot(np.linalg.pinv(arr_a), arr_c)
-    #     a_t = np.dot(arr_a, dtp)
-
-    #     _, inf_exp = math.frexp(np.linalg.norm(a_t, ord=np.inf))
-    #     j = max(0, inf_exp)
-    #     a_t = a_t * (1 / pow(2, j))
-
-    #     x = a_t.copy()
-    #     c = 0.5
-    #     n = np.identity(arr_a.shape[0])
-    #     d = n - c * a_t
-    #     n = n + c * a_t
-
-    #     p = True
-    #     for k in range(2, n_iter + 1):
-    #         c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-    #         x = np.dot(a_t, x)
-    #         c_x = c * x
-    #         n = n + c_x
-    #         if p:
-    #             d = d + c_x
-    #         else:
-    #             d = d - c_x
-    #         p = not p
-
-    #     f = np.dot(np.linalg.pinv(d), n)
-    #     for k in range(1, j + 1):
-    #         f = np.dot(f, f)
-    #     mag_ = np.dot(f, (mag_ + a_inv_t)) - a_inv_t
-    #     return mag_[np.newaxis, :, np.newaxis]
 
     def solve_equation(self, mag: np.ndarray, dtp: float) -> np.ndarray:
         """
