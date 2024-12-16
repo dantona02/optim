@@ -5,6 +5,7 @@ import subprocess
 import json
 
 from typing import Tuple, Union
+from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.bmc_tool import BMCTool
 from bmc.bmc_tool import prep_rf_simulation, prep_grad_simulation
 from bmc.params import Params
@@ -14,7 +15,7 @@ from manim.opengl import *
 
 
 class BMCSim(BMCTool):
-    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, verbose: bool = True, write_all_mag: bool = False, **kwargs) -> None:
+    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, z_positions: np.ndarray, verbose: bool = True, write_all_mag: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         """
         Parameters
@@ -28,6 +29,10 @@ class BMCSim(BMCTool):
         verbose : bool, optional
             Flag to activate detailed outpus, by default True
         """
+        self.z_positions = z_positions
+        self.n_isochromats = len(self.z_positions)
+        self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets, z_positions=self.z_positions)
+        
         self.adc_time = adc_time
         self.write_all_mag = write_all_mag
         
@@ -40,11 +45,18 @@ class BMCSim(BMCTool):
             self.n_measure = int(self.defs["num_meas"]) #redefining n_measure to max_pulse_samples
         else:
             self.n_measure = self.n_offsets
-            
-        self.m_out = np.zeros([self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
+
+        
+        
+
+        print(self.n_isochromats)
+
+        self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
 
         self.t = np.array([])
+
+        
 
 
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
@@ -57,7 +69,7 @@ class BMCSim(BMCTool):
             self.t = np.append(self.t, time_array)
 
             for step in range(self.params.options["max_pulse_samples"]):
-                self.m_out[:, current_adc] = np.squeeze(mag)
+                self.m_out[:, :, current_adc] = np.squeeze(mag)
                 
                 accum_phase = 0
                 current_adc += 1
@@ -67,6 +79,7 @@ class BMCSim(BMCTool):
             
             # RF pulse
         elif block.rf is not None:
+            
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
             if self.write_all_mag:
@@ -77,7 +90,7 @@ class BMCSim(BMCTool):
 
             for i in range(amp_.size):
                 if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
-                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
 
                 self.bm_solver.update_matrix(
@@ -92,7 +105,7 @@ class BMCSim(BMCTool):
             if delay_after_pulse > 0: #might cause problems if delay_after_pulse is significantly larger than 0
                 self.bm_solver.update_matrix(0, 0, 0)
                 if self.write_all_mag:
-                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
@@ -112,7 +125,7 @@ class BMCSim(BMCTool):
             for i in range(amp_.size):
                 
                 if self.write_all_mag:
-                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
 
                 self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
@@ -121,7 +134,7 @@ class BMCSim(BMCTool):
             if delay_after_grad > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
                 if self.write_all_mag:
-                    self.m_out[:, current_adc] = np.squeeze(mag)
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
 
@@ -143,7 +156,7 @@ class BMCSim(BMCTool):
 
         current_adc = 0
         accum_phase = 0
-        mag = self.m_init[np.newaxis, :, np.newaxis]
+        mag = self.m_init[np.newaxis, np.newaxis, :, np.newaxis] #extended to [n_isochromats, ...]
 
         try:
             block_events = self.seq.block_events
@@ -178,24 +191,25 @@ class BMCSim(BMCTool):
             If True, returns magnetization of the first cest pool
         """
 
+
         if return_cest_pool and self.params.cest_pools:
             if return_zmag:
-                m_z = self.m_out[self.params.mz_loc + 1, :]
+                m_z = self.m_out[:, self.params.mz_loc + 1, :]
                 return self.t, np.abs(m_z)
             else:
                 n_total_pools = len(self.params.cest_pools) + 1
-                m_trans_c = self.m_out[1, :] + 1j * self.m_out[n_total_pools + 1, :]
+                m_trans_c = self.m_out[:, 1, :] + 1j * self.m_out[:, n_total_pools + 1, :]
                 return self.t, m_trans_c
         else:
             if return_zmag:
-                m_z = self.m_out[self.params.mz_loc, :]
+                m_z = self.m_out[:, self.params.mz_loc, :]
                 return self.t, m_z
             elif self.params.cest_pools:
                 n_total_pools = len(self.params.cest_pools) + 1
-                m_trans_c = self.m_out[0, :] + 1j * self.m_out[n_total_pools, :]
+                m_trans_c = self.m_out[:, 0, :] + 1j * self.m_out[:, n_total_pools, :]
                 return self.t, m_trans_c
             else:
-                m_trans_c = self.m_out[0, :] + 1j * self.m_out[1, :]
+                m_trans_c = self.m_out[:, 0, :] + 1j * self.m_out[:, 1, :]
                 return self.t, m_trans_c
     
     def animate(self, step: int = 1, run_time = 0.1, track_path=False, ie=False, timing=False, **addParams) -> None:

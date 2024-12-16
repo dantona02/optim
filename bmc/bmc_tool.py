@@ -175,7 +175,7 @@ class BMCTool:
         self.m_init = params.m_vec.copy()
         self.m_out = np.zeros([self.m_init.shape[0], self.n_measure])
 
-        self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets)
+        #self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets, n_isochromats=1)
 
     def update_params(self, params: Params) -> None:
         """

@@ -14,7 +14,7 @@ class BlochMcConnellSolver:
     Solver class for Bloch-McConnell equations.
     """
 
-    def __init__(self, params: Params, n_offsets: int) -> None:
+    def __init__(self, params: Params, n_offsets: int, z_positions: np.ndarray) -> None:
         """
         __init__ Initialize BlochMcConnellSolver class.
 
@@ -27,6 +27,9 @@ class BlochMcConnellSolver:
         """
         self.params: Params = params
         self.n_offsets: int = n_offsets
+        self.z_positions: np.ndarray = z_positions
+        self.n_isochromats: int = len(z_positions)
+
         self.par_calc: bool = params.options["par_calc"]
         self.first_dim: int = 1
         self.n_pools: int = len(params.cest_pools)
@@ -36,6 +39,8 @@ class BlochMcConnellSolver:
         self.arr_c: np.ndarray = None
         self.w0: float = None
         self.dw0: float = None
+
+        print(self.n_isochromats)
 
         self.update_params(params)
 
@@ -85,14 +90,18 @@ class BlochMcConnellSolver:
             self.arr_a[i + 1 + 2 * (n_p + 1), 2 * (n_p + 1)] = k_ai
             self.arr_a[i + 1 + 2 * (n_p + 1), i + 1 + 2 * (n_p + 1)] = -k_1i
 
-        # always expand to 3 dimensions
+        # always expand to 4 dimensions
         self.arr_a = self.arr_a[
             np.newaxis,
+            np.newaxis,
         ]
+        self.arr_a = np.repeat(self.arr_a, self.n_isochromats, axis=0) #array shape (n_isochromats, 1, size, size)
+
 
         # if parallel computation is activated, repeat matrix A n_offsets times along a new axis
         if self.par_calc:
-            self.arr_a = np.repeat(self.arr_a, self.n_offsets, axis=0)
+            # self.arr_a = np.repeat(self.arr_a, self.n_isochromats, axis=0)
+            self.arr_a = np.repeat(self.arr_a, self.n_offsets, axis=1)
             self.first_dim = self.n_offsets
 
     def _init_vector_c(self) -> None:
@@ -109,7 +118,8 @@ class BlochMcConnellSolver:
             self.arr_c[3 * (n_p + 1)] = self.params.mt_pool["f"] * self.params.mt_pool["r1"]
 
         # always expand to 3 dimensions (independent of sequential or parallel computation)
-        self.arr_c = self.arr_c[np.newaxis, :, np.newaxis]
+        self.arr_c = self.arr_c[np.newaxis, np.newaxis, :, np.newaxis]
+        self.arr_c = np.repeat(self.arr_c, self.n_isochromats, axis=0)
 
         # if parallel computation is activated, repeat matrix C n_offsets times along axis 0
         if self.par_calc:
@@ -127,6 +137,7 @@ class BlochMcConnellSolver:
 
     def update_matrix(self, rf_amp: float, rf_phase: np.ndarray, rf_freq: np.ndarray, grad_amp: float = 0) -> None:
         """
+        rf_phase and rf_freq might be floats not arrays
         Updates matrix self.A according to given parameters.
         :param rf_amp: amplitude of current step (e.g. pulse fragment)
         :param rf_phase: phase of current step (e.g. pulse fragment)
@@ -134,14 +145,15 @@ class BlochMcConnellSolver:
         """
         j = self.first_dim  # size of first dimension (=1 for sequential, n_offsets for parallel)
         n_p = self.n_pools
+        grad_term = 2 * np.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
 
         # set dw0 due to b0_inhomogeneity
-        self.arr_a[:, 0, 1 + n_p] = [self.dw0] * j
-        self.arr_a[:, 1 + n_p, 0] = [-1 * self.dw0] * j
+        self.arr_a[:, :, 0, 1 + n_p] = [self.dw0] * j
+        self.arr_a[:, :, 1 + n_p, 0] = [-1 * self.dw0] * j
 
         #set dw_grad for water pool
-        self.arr_a[:, 0, 1 + n_p] += 2 * np.pi * grad_amp * 1e-6
-        self.arr_a[:, 1 + n_p, 0] -= 2 * np.pi * grad_amp * 1e-6
+        self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j??
+        self.arr_a[:, :, 1 + n_p, 0] -= grad_term
 
         # calculate omega_1
         rf_amp_2pi = rf_amp * 2 * np.pi * self.params.scanner["rel_b1"]
@@ -149,85 +161,132 @@ class BlochMcConnellSolver:
         rf_amp_2pi_cos = rf_amp_2pi * np.cos(rf_phase)
 
         # set omega_1 for water_pool
-        self.arr_a[:, 0, 2 * (n_p + 1)] = -rf_amp_2pi_sin
-        self.arr_a[:, 2 * (n_p + 1), 0] = rf_amp_2pi_sin
+        self.arr_a[:, :, 0, 2 * (n_p + 1)] = -rf_amp_2pi_sin
+        self.arr_a[:, :, 2 * (n_p + 1), 0] = rf_amp_2pi_sin
 
-        self.arr_a[:, n_p + 1, 2 * (n_p + 1)] = rf_amp_2pi_cos
-        self.arr_a[:, 2 * (n_p + 1), n_p + 1] = -rf_amp_2pi_cos
+        self.arr_a[:, :, n_p + 1, 2 * (n_p + 1)] = rf_amp_2pi_cos
+        self.arr_a[:, :, 2 * (n_p + 1), n_p + 1] = -rf_amp_2pi_cos
 
         # set omega_1 for cest pools
         for i in range(1, n_p + 1):
-            self.arr_a[:, i, i + 2 * (n_p + 1)] = -rf_amp_2pi_sin
-            self.arr_a[:, i + 2 * (n_p + 1), i] = rf_amp_2pi_sin
+            self.arr_a[:, :, i, i + 2 * (n_p + 1)] = -rf_amp_2pi_sin
+            self.arr_a[:, :, i + 2 * (n_p + 1), i] = rf_amp_2pi_sin
 
-            self.arr_a[:, n_p + 1 + i, i + 2 * (n_p + 1)] = rf_amp_2pi_cos
-            self.arr_a[:, i + 2 * (n_p + 1), n_p + 1 + i] = -rf_amp_2pi_cos
+            self.arr_a[:, :, n_p + 1 + i, i + 2 * (n_p + 1)] = rf_amp_2pi_cos
+            self.arr_a[:, :, i + 2 * (n_p + 1), n_p + 1 + i] = -rf_amp_2pi_cos
 
         # set off-resonance terms for water pool, rf_freq is frequency offset from water
         rf_freq_2pi = rf_freq * 2 * np.pi
-        self.arr_a[:, 0, 1 + n_p] += rf_freq_2pi
-        self.arr_a[:, 1 + n_p, 0] -= rf_freq_2pi
+        self.arr_a[:, :, 0, 1 + n_p] += rf_freq_2pi
+        self.arr_a[:, :, 1 + n_p, 0] -= rf_freq_2pi
 
         
 
         # set off-resonance terms for cest pools
         for i in range(1, n_p + 1):
             dwi = self.params.cest_pools[i - 1]["dw"] * self.w0 - (rf_freq_2pi + self.dw0)
-            self.arr_a[:, i, i + n_p + 1] = -dwi
-            self.arr_a[:, i + n_p + 1, i] = dwi
+            self.arr_a[:, :, i, i + n_p + 1] = -dwi
+            self.arr_a[:, :, i + n_p + 1, i] = dwi
 
-            self.arr_a[:, i, i + n_p + 1] -= 2 * np.pi * grad_amp * 1e-5
-            self.arr_a[:, i + n_p + 1, i] += 2 * np.pi * grad_amp * 1e-5
+            self.arr_a[:, :, i, i + n_p + 1] -= grad_term
+            self.arr_a[:, :, i + n_p + 1, i] += grad_term
 
         # mt_pool
         if self.is_mt_active:
-            self.arr_a[:, 3 * (n_p + 1), 3 * (n_p + 1)] = (
+            self.arr_a[:, :, 3 * (n_p + 1), 3 * (n_p + 1)] = (
                 -self.params.mt_pool["r1"]
                 - self.params.mt_pool["k"]
                 - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0) # implementation of gradient needs to be implemented
             )
 
+    # def solve_equation(self, mag: np.ndarray, dtp: float) -> np.ndarray:
+    #     """
+    #     Solves one step of BMC equations using the Padé approximation. This function is not used atm.
+    #     :param mag: magnetization vector before current step
+    #     :param dtp: duration of current step
+    #     :return: magnetization vector after current step
+    #     """
+    #     arr_a = np.squeeze(self.arr_a)
+    #     arr_c = np.squeeze(self.arr_c)
+    #     mag_ = np.squeeze(mag)
+    #     n_iter = 6  # number of iterations
+    #     a_inv_t = np.dot(np.linalg.pinv(arr_a), arr_c)
+    #     a_t = np.dot(arr_a, dtp)
+
+    #     _, inf_exp = math.frexp(np.linalg.norm(a_t, ord=np.inf))
+    #     j = max(0, inf_exp)
+    #     a_t = a_t * (1 / pow(2, j))
+
+    #     x = a_t.copy()
+    #     c = 0.5
+    #     n = np.identity(arr_a.shape[0])
+    #     d = n - c * a_t
+    #     n = n + c * a_t
+
+    #     p = True
+    #     for k in range(2, n_iter + 1):
+    #         c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
+    #         x = np.dot(a_t, x)
+    #         c_x = c * x
+    #         n = n + c_x
+    #         if p:
+    #             d = d + c_x
+    #         else:
+    #             d = d - c_x
+    #         p = not p
+
+    #     f = np.dot(np.linalg.pinv(d), n)
+    #     for k in range(1, j + 1):
+    #         f = np.dot(f, f)
+    #     mag_ = np.dot(f, (mag_ + a_inv_t)) - a_inv_t
+    #     return mag_[np.newaxis, :, np.newaxis]
+
     def solve_equation(self, mag: np.ndarray, dtp: float) -> np.ndarray:
         """
-        Solves one step of BMC equations using the Padé approximation. This function is not used atm.
-        :param mag: magnetization vector before current step
+        Solves one step of BMC equations for multiple Isochromaten using the Padé approximation.
+        :param mag: magnetization vector before current step (shape: [n_isochromats, size, 1])
         :param dtp: duration of current step
-        :return: magnetization vector after current step
+        :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
         """
-        arr_a = np.squeeze(self.arr_a)
-        arr_c = np.squeeze(self.arr_c)
-        mag_ = np.squeeze(mag)
         n_iter = 6  # number of iterations
-        a_inv_t = np.dot(np.linalg.pinv(arr_a), arr_c)
-        a_t = np.dot(arr_a, dtp)
+        arr_a = self.arr_a
+        arr_c = self.arr_c
+        a_inv_t = np.matmul(np.linalg.pinv(arr_a), arr_c)  # Shape: [n_isochromats, n_offsets, size, 1]
 
-        _, inf_exp = math.frexp(np.linalg.norm(a_t, ord=np.inf))
-        j = max(0, inf_exp)
-        a_t = a_t * (1 / pow(2, j))
+        # Compute `a_t` for all Isochromaten
+        a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
 
+        # Normalize `a_t` to avoid numerical instability
+        _, inf_exp = np.frexp(np.linalg.norm(a_t, ord=np.inf, axis=(2, 3)))
+        j = np.maximum(0, inf_exp)
+        a_t /= np.power(2, j[:, :, np.newaxis, np.newaxis])  # Normalize across batch and offset
+
+        # Initialize Padé approximation
+        identity = np.eye(arr_a.shape[-1])[np.newaxis, np.newaxis, :, :]
+        identity = np.repeat(identity, arr_a.shape[0], axis=0)
         x = a_t.copy()
         c = 0.5
-        n = np.identity(arr_a.shape[0])
-        d = n - c * a_t
-        n = n + c * a_t
+        n = identity + c * a_t
+        d = identity - c * a_t
 
         p = True
         for k in range(2, n_iter + 1):
             c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-            x = np.dot(a_t, x)
+            x = np.matmul(a_t, x)
             c_x = c * x
-            n = n + c_x
-            if p:
-                d = d + c_x
-            else:
-                d = d - c_x
+            n += c_x
+            d += c_x if p else -c_x
             p = not p
 
-        f = np.dot(np.linalg.pinv(d), n)
-        for k in range(1, j + 1):
-            f = np.dot(f, f)
-        mag_ = np.dot(f, (mag_ + a_inv_t)) - a_inv_t
-        return mag_[np.newaxis, :, np.newaxis]
+        # Solve for the matrix exponential
+        f = np.matmul(np.linalg.pinv(d), n)
+        for _ in range(j.max()):
+            f = np.matmul(f, f)
+
+        # Compute the final magnetization
+        mag = np.matmul(f, mag + a_inv_t) - a_inv_t
+        return mag
+
 
     def solve_equation_expm(self, mag: np.ndarray, dtp: float) -> np.ndarray:
         """

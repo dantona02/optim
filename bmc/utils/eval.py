@@ -200,8 +200,8 @@ def plot_fid( # plot FID for FID class
     ax1.set_xlabel(x_label)
     ax1.set_xlim(plt_range)
  
-    plt.plot(time, np.abs(m_out), ".--", label="$x$", color="b")
-    plt.plot(time, np.angle(m_out), ".--", label="$x$", color="r")
+    plt.plot(time, np.abs(m_out[1]), ".--", label="$x$", color="b")
+    plt.plot(time, np.angle(m_out[1]), ".--", label="$x$", color="r")
 
     ax1.tick_params(axis="y", labelcolor="b")
     ax1.axvline(0, color='black', linestyle='--')
