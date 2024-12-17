@@ -85,8 +85,9 @@ class BMCSim(BMCTool):
             if self.write_all_mag:
                 start_time = self.t[-1] if self.t.size > 0 else 0
                 print(f'rf at {start_time:.4f}s')
-                time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
+                time_array = start_time + np.arange(amp_.size) * dtp_
                 self.t = np.append(self.t, time_array)
+
 
             for i in range(amp_.size):
                 if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
@@ -119,7 +120,7 @@ class BMCSim(BMCTool):
             if self.write_all_mag:
                 start_time = self.t[-1] if self.t.size > 0 else 0
                 print(f'gz at {start_time:.4f}s')
-                time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * dtp_
+                time_array = start_time + np.arange(amp_.size) * dtp_
                 self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
@@ -178,6 +179,9 @@ class BMCSim(BMCTool):
             for block_event in loop_block_events:
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
+
+        self.m_out = self.m_out[:, :, :self.t.size]
+    
 
     def get_mag(self, return_zmag: bool = False, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """

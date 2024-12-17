@@ -222,13 +222,13 @@ def plot_sim(
     if time is None:
         time = range(len(m_out))
     
-    print(m_out[4][-12:])
-    print(np.argwhere(m_out[4] == 0))
+    # print(m_out[4][-12:])
+    # print(np.argwhere(m_out[0] == 0))
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))  # Zwei Subplots nebeneinander
 
     # Signal Plot (Magnitude)
-    ax1.plot(time, np.abs(m_out[4]), ".--", color="b", label="|M|")
+    ax1.plot(time, np.abs(m_out[0]), ".--", color="b", label="|M|")
     ax1.set_title(title_signal)
     ax1.set_xlabel(x_label)
     ax1.set_ylabel(y_label_signal)
@@ -238,7 +238,7 @@ def plot_sim(
     ax1.grid(True)
 
     # Phase Plot
-    ax2.plot(time, np.angle(m_out[4]), ".--", color="r", label="Phase")
+    ax2.plot(time, np.angle(m_out[0]), ".--", color="r", label="Phase")
     ax2.set_title(title_phase)
     ax2.set_xlabel(x_label)
     ax2.set_ylabel(y_label_phase)
