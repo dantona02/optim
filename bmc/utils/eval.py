@@ -7,6 +7,8 @@ from typing import Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
+from matplotlib import colors as mcolors
+from manim import color_gradient, PURE_BLUE, PURE_GREEN, PURE_RED
 
 
 def calc_mtr_asym(m_z: np.ndarray, offsets: np.ndarray, n_interp: int = 1000) -> np.ndarray:
@@ -181,73 +183,119 @@ def plot_z(
 
     return fig
 
+from matplotlib.colors import TwoSlopeNorm
 
 def plot_sim( 
-    m_out: np.ndarray, 
+    m_out: Union[np.ndarray, list, tuple], 
     time: Union[np.ndarray, None] = None,
     plt_range: list = None,
+    iso_select: Union[list, tuple] = None,  # Neues Argument für Isochromaten-Auswahl
     title_signal: str = "Signal", 
     title_phase: str = "Phase",
     x_label: str = "time [s]", 
     y_label_signal: str = "Signal Amplitude",
-    y_label_phase: str = "Phase [radians]"
-) -> Figure:
+    y_label_phase: str = "Phase [radians]",
+    colorbar_label: str = "Isochromat Index"
+) -> None:
     """
-    Plots the Signal and Phase separately in two subplots side by side.
-
-    Parameters
-    ----------
-    m_out : np.ndarray
-        Output magnetization array.
-    time : Union[np.ndarray, None], optional
-        Time vector, by default None.
-    plt_range : list, optional
-        Range for the x-axis, by default None.
-    title_signal : str, optional
-        Title for the signal plot, by default "Signal".
-    title_phase : str, optional
-        Title for the phase plot, by default "Phase".
-    x_label : str, optional
-        Label for the x-axis, by default "time [s]".
-    y_label_signal : str, optional
-        Label for the signal plot y-axis, by default "Signal Amplitude".
-    y_label_phase : str, optional
-        Label for the phase plot y-axis, by default "Phase [radians]".
-
-    Returns
-    -------
-    Figure
-        Matplotlib figure object.
+    Plots Signal and Phase with a centered color gradient and colorbar showing Isochromat indices.
+    The second vector in m_out is always plotted in black.
     """
     if time is None:
-        time = range(len(m_out))
+        time = np.arange(m_out.shape[-1])
     
-    # print(m_out[4][-12:])
-    # print(np.argwhere(m_out[0] == 0))
+    if not isinstance(m_out, (list, tuple)):
+        m_out = [m_out]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))  # Zwei Subplots nebeneinander
+    n_isochromats = m_out[0].shape[0]
+    center_idx = n_isochromats // 2
+
+    # Dynamische Auswahl der Isochromaten
+    if iso_select is not None:
+        if isinstance(iso_select, tuple):  # Bereichsangabe (-2, 2)
+            selected_indices = [
+                i for i in range(n_isochromats) 
+                if iso_select[0] <= (i - center_idx) <= iso_select[1]
+            ]
+        elif isinstance(iso_select, list):  # Einzelne Indizes
+            selected_indices = [
+                i + center_idx for i in iso_select if -center_idx <= i <= center_idx
+            ]
+        else:
+            raise ValueError("iso_select must be a list of indices or a tuple (range).")
+    else:
+        selected_indices = range(n_isochromats)  # Standard: Alle Isochromaten
+    
+    # Farbverlauf exakt wie in Animation Class
+    manim_colors = color_gradient([PURE_BLUE, PURE_GREEN, PURE_RED], n_isochromats)
+    hex_colors = [mcolors.to_hex(c.to_rgb()) for c in manim_colors]
+
+    # Plot vorbereiten
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))  # Zwei Subplots nebeneinander
 
     # Signal Plot (Magnitude)
-    ax1.plot(time, np.abs(m_out[0]), ".--", color="b", label="|M|")
+    for idx in selected_indices:
+        ax1.plot(
+            time, 
+            np.abs(m_out[0][idx]), 
+            ".--",                    # Punkte mit gestrichelter Linie
+            color=hex_colors[idx], 
+            label=f"Iso {idx - center_idx}",
+            markersize=4
+        )
+    # Der zweite Vektor wird immer schwarz geplottet
+    ax1.plot(
+        time, 
+        np.abs(m_out[1]), 
+        ".--", 
+        color="black", 
+        label="Second Vector",
+        markersize=4
+    )
     ax1.set_title(title_signal)
     ax1.set_xlabel(x_label)
     ax1.set_ylabel(y_label_signal)
     ax1.set_xlim(plt_range)
-    ax1.axvline(0, color='black', linestyle='--')  # Null-Linien
-    ax1.axhline(0, color='black', linestyle='--')
     ax1.grid(True)
 
     # Phase Plot
-    ax2.plot(time, np.angle(m_out[0]), ".--", color="r", label="Phase")
+    for idx in selected_indices:
+        ax2.plot(
+            time, 
+            np.angle(m_out[0][idx]), 
+            ".--",                    # Punkte mit gestrichelter Linie
+            color=hex_colors[idx], 
+            label=f"Iso {idx - center_idx}",
+            markersize=4
+        )
+    # Der zweite Vektor wird immer schwarz geplottet
+    ax2.plot(
+        time, 
+        np.angle(m_out[1]), 
+        ".--", 
+        color="black", 
+        label="Second Vector",
+        markersize=4
+    )
     ax2.set_title(title_phase)
     ax2.set_xlabel(x_label)
     ax2.set_ylabel(y_label_phase)
     ax2.set_xlim(plt_range)
-    ax2.axvline(0, color='black', linestyle='--')  # Null-Linien
-    ax2.axhline(0, color='black', linestyle='--')
     ax2.grid(True)
 
-    # Layout anpassen und anzeigen
+    # Farbleiste zentriert bei 0
+    center_idx = n_isochromats // 2
+    vmin, vcenter, vmax = -center_idx, 0, center_idx
+    norm = TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
+    sm = plt.cm.ScalarMappable(cmap=mcolors.ListedColormap(hex_colors), norm=norm)
+    sm.set_array([])
+
+    # Farbverlauf hinzufügen
+    cbar = fig.colorbar(sm, ax=[ax1, ax2], orientation="horizontal", label=colorbar_label)
+    ticks = [-center_idx, 0, center_idx]
+    cbar.set_ticks(ticks)
+    cbar.ax.set_position([0.35, -5.3, 0.32, 5.2])
+
     plt.tight_layout()
     plt.show()
 

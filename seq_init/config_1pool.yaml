@@ -20,7 +20,15 @@ water_pool: {
   t2: 500e-3
 }
 
-
+cest_pool: {  
+  'amide': {
+    f: 0.000690, # 72e-3 / 111,
+    t1: 2.9,
+    t2: 0.1,
+    k: 150,
+    dw: 4
+  }
+}
 
 # CEST
 #cest_pool: {  
@@ -41,7 +49,7 @@ water_pool: {
 
 b0: 17
 gamma: 267.5153
-b0_inhom: 0.0
+b0_inhom: 0.01
 rel_b1: 1
 
 ##### Additional simulation settings

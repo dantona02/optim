@@ -14,7 +14,7 @@ from bmc.utils.eval import plot_z, plot_sim
 
 
 
-def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plot: bool = False, **kwargs) -> BMCTool:
+def simulate_(config_file: Union[str, Path], seq_file: Union[str, Path], show_plot: bool = False, **kwargs) -> BMCTool:
     """
     simulate Run BMCTool simulation based on given seq-file and config file.
 
@@ -63,7 +63,16 @@ def simulate(config_file: Union[str, Path], seq_file: Union[str, Path], show_plo
     return sim
 
 
-def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], z_positions: np.ndarray, adc_time: np.float64, write_all_mag: bool = False, show_plot: bool = False, plt_range: list = [0, 5], **kwargs) -> BMCSim:
+def simulate(config_file: Union[str, Path],
+                 seq_file: Union[str, Path],
+                 z_positions: np.ndarray,
+                 adc_time: np.float64,
+                 iso_select: Union[list, tuple],
+                 return_zmag: bool = False,
+                 write_all_mag: bool = False,
+                 show_plot: bool = False,
+                 plt_range: list = [0, 5],
+                 **kwargs) -> BMCSim:
     """
     simulate Run BMCTool simulation based on given seq-file and config file.
 
@@ -102,9 +111,12 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], z_po
 
     if show_plot:
 
-        time, mag = sim.get_mag()
+        time, m_z, m_z_total, m_c, m_c_total = sim.get_mag()
 
-        plot_sim(m_out=mag, time=time, plt_range=plt_range, **kwargs)
+        if return_zmag:
+            plot_sim(m_out=[m_z, m_z_total], time=time, plt_range=plt_range, iso_select=iso_select, **kwargs)
+        else:
+            plot_sim(m_out=[m_c, m_c_total], time=time, plt_range=plt_range, iso_select=iso_select, **kwargs)
 
     return sim
 
