@@ -182,32 +182,73 @@ def plot_z(
     return fig
 
 
-def plot_fid( # plot FID for FID class
+def plot_sim( 
     m_out: np.ndarray, 
     time: Union[np.ndarray, None] = None,
-    plt_range : list = None,
-    title: str = "Signal/Phase", 
+    plt_range: list = None,
+    title_signal: str = "Signal", 
+    title_phase: str = "Phase",
     x_label: str = "time [s]", 
-    y_label: str = "signal") -> Figure:
-    
+    y_label_signal: str = "Signal Amplitude",
+    y_label_phase: str = "Phase [radians]"
+) -> Figure:
+    """
+    Plots the Signal and Phase separately in two subplots side by side.
 
+    Parameters
+    ----------
+    m_out : np.ndarray
+        Output magnetization array.
+    time : Union[np.ndarray, None], optional
+        Time vector, by default None.
+    plt_range : list, optional
+        Range for the x-axis, by default None.
+    title_signal : str, optional
+        Title for the signal plot, by default "Signal".
+    title_phase : str, optional
+        Title for the phase plot, by default "Phase".
+    x_label : str, optional
+        Label for the x-axis, by default "time [s]".
+    y_label_signal : str, optional
+        Label for the signal plot y-axis, by default "Signal Amplitude".
+    y_label_phase : str, optional
+        Label for the phase plot y-axis, by default "Phase [radians]".
+
+    Returns
+    -------
+    Figure
+        Matplotlib figure object.
+    """
     if time is None:
         time = range(len(m_out))
+    
+    print(m_out[4][-12:])
+    print(np.argwhere(m_out[4] == 0))
 
-    fig, ax1 = plt.subplots()
-    #ax1.set_ylim([round(min(np.abs(m_out)) - 0.05, 2), round(max(np.abs(m_out)) + 0.05, 2)])
-    ax1.set_ylabel(y_label, color="b")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))  # Zwei Subplots nebeneinander
+
+    # Signal Plot (Magnitude)
+    ax1.plot(time, np.abs(m_out[4]), ".--", color="b", label="|M|")
+    ax1.set_title(title_signal)
     ax1.set_xlabel(x_label)
+    ax1.set_ylabel(y_label_signal)
     ax1.set_xlim(plt_range)
- 
-    plt.plot(time, np.abs(m_out[1]), ".--", label="$x$", color="b")
-    plt.plot(time, np.angle(m_out[1]), ".--", label="$x$", color="r")
-
-    ax1.tick_params(axis="y", labelcolor="b")
-    ax1.axvline(0, color='black', linestyle='--')
+    ax1.axvline(0, color='black', linestyle='--')  # Null-Linien
     ax1.axhline(0, color='black', linestyle='--')
+    ax1.grid(True)
 
-    plt.title(title)
+    # Phase Plot
+    ax2.plot(time, np.angle(m_out[4]), ".--", color="r", label="Phase")
+    ax2.set_title(title_phase)
+    ax2.set_xlabel(x_label)
+    ax2.set_ylabel(y_label_phase)
+    ax2.set_xlim(plt_range)
+    ax2.axvline(0, color='black', linestyle='--')  # Null-Linien
+    ax2.axhline(0, color='black', linestyle='--')
+    ax2.grid(True)
+
+    # Layout anpassen und anzeigen
+    plt.tight_layout()
     plt.show()
 
     return fig

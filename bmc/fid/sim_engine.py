@@ -49,7 +49,8 @@ class BMCSim(BMCTool):
         
         
 
-        print(self.n_isochromats)
+        # print(self.n_measure)
+        # print(self.params.options["max_pulse_samples"])
 
         self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
@@ -156,6 +157,7 @@ class BMCSim(BMCTool):
         current_adc = 0
         accum_phase = 0
         mag = self.m_init[np.newaxis, np.newaxis, :, np.newaxis] #extended to [n_isochromats, ...]
+        # print(mag.shape)
 
         try:
             block_events = self.seq.block_events

@@ -10,7 +10,7 @@ import numpy as np
 from bmc.bmc_tool import BMCTool
 from bmc.fid.sim_engine import BMCSim
 from bmc.set_params import load_params
-from bmc.utils.eval import plot_z, plot_fid
+from bmc.utils.eval import plot_z, plot_sim
 
 
 
@@ -104,7 +104,7 @@ def simulate_fid(config_file: Union[str, Path], seq_file: Union[str, Path], z_po
 
         time, mag = sim.get_mag()
 
-        plot_fid(m_out=mag, time=time, plt_range=plt_range, **kwargs)
+        plot_sim(m_out=mag, time=time, plt_range=plt_range, **kwargs)
 
     return sim
 
