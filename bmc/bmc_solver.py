@@ -4,14 +4,14 @@ bmc_solver.py
 """
 import numpy as np
 from bmc.params import Params
+import torch
 
 
 class BlochMcConnellSolver:
     """
     Solver class for Bloch-McConnell equations.
     """
-
-    def __init__(self, params: Params, n_offsets: int, z_positions: np.ndarray) -> None:
+    def __init__(self, params: Params, n_offsets: int, z_positions: torch.Tensor) -> None:
         """
         __init__ Initialize BlochMcConnellSolver class.
 
@@ -21,10 +21,12 @@ class BlochMcConnellSolver:
             Parameters object containing all required parameters.
         n_offsets : int
             Number of frequency offsets.
+        z_positions : torch.Tensor
+            Tensor containing z-positions for isochromats.
         """
         self.params: Params = params
         self.n_offsets: int = n_offsets
-        self.z_positions: np.ndarray = z_positions
+        self.z_positions: torch.Tensor = z_positions
         self.n_isochromats: int = len(z_positions)
 
         self.par_calc: bool = params.options["par_calc"]
@@ -32,8 +34,8 @@ class BlochMcConnellSolver:
         self.n_pools: int = len(params.cest_pools)
         self.is_mt_active = bool(params.mt_pool)
         self.size: int = params.m_vec.size
-        self.arr_a: np.ndarray = None
-        self.arr_c: np.ndarray = None
+        self.arr_a: torch.Tensor = None
+        self.arr_c: torch.Tensor = None
         self.w0: float = None
         self.dw0: float = None
 
@@ -44,9 +46,9 @@ class BlochMcConnellSolver:
         Initialize self.arr_a with all parameters from self.params.
         """
         n_p = self.n_pools
-        self.arr_a = np.zeros([self.size, self.size], dtype=float)
+        self.arr_a = torch.zeros([self.size, self.size], dtype=torch.float64)
 
-        # set mt_pool parameters
+        # Set mt_pool parameters
         k_ac = 0.0
         if self.is_mt_active:
             k_ca = self.params.mt_pool["k"]
@@ -54,7 +56,7 @@ class BlochMcConnellSolver:
             self.arr_a[2 * (n_p + 1), 3 * (n_p + 1)] = k_ca
             self.arr_a[3 * (n_p + 1), 2 * (n_p + 1)] = k_ac
 
-        # set water_pool parameters
+        # Set water_pool parameters
         k1a = self.params.water_pool["r1"] + k_ac
         k2a = self.params.water_pool["r2"]
         for pool in self.params.cest_pools:
@@ -66,7 +68,7 @@ class BlochMcConnellSolver:
         self.arr_a[1 + n_p, 1 + n_p] = -k2a
         self.arr_a[2 + 2 * n_p, 2 + 2 * n_p] = -k1a
 
-        # set cest_pools parameters
+        # Set cest_pools parameters
         for i, pool in enumerate(self.params.cest_pools):
             k_ia = pool["k"]
             k_ai = k_ia * pool["f"]
@@ -85,18 +87,13 @@ class BlochMcConnellSolver:
             self.arr_a[i + 1 + 2 * (n_p + 1), 2 * (n_p + 1)] = k_ai
             self.arr_a[i + 1 + 2 * (n_p + 1), i + 1 + 2 * (n_p + 1)] = -k_1i
 
-        # always expand to 4 dimensions
-        self.arr_a = self.arr_a[
-            np.newaxis,
-            np.newaxis,
-        ]
-        self.arr_a = np.repeat(self.arr_a, self.n_isochromats, axis=0) #array shape (n_isochromats, 1, size, size)
+        # Always expand to 4 dimensions
+        self.arr_a = self.arr_a.unsqueeze(0).unsqueeze(0)  # Add batch and offset dimensions
+        self.arr_a = self.arr_a.repeat(self.n_isochromats, 1, 1, 1)  # Repeat for n_isochromats
 
-
-        # if parallel computation is activated, repeat matrix A n_offsets times along a new axis
+        # If parallel computation is activated, repeat matrix A n_offsets times along a new axis
         if self.par_calc:
-            # self.arr_a = np.repeat(self.arr_a, self.n_isochromats, axis=0)
-            self.arr_a = np.repeat(self.arr_a, self.n_offsets, axis=1)
+            self.arr_a = self.arr_a.repeat(1, self.n_offsets, 1, 1)
             self.first_dim = self.n_offsets
 
     def _init_vector_c(self) -> None:
@@ -104,22 +101,27 @@ class BlochMcConnellSolver:
         Initialize vector self.C with all parameters from self.params.
         """
         n_p = self.n_pools
-        self.arr_c = np.zeros([self.size], dtype=float)
+        self.arr_c = torch.zeros([self.size], dtype=torch.float64)
+
+        # Set water pool parameters
         self.arr_c[(n_p + 1) * 2] = self.params.water_pool["f"] * self.params.water_pool["r1"]
+
+        # Set CEST pools parameters
         for i, pool in enumerate(self.params.cest_pools):
             self.arr_c[(n_p + 1) * 2 + (i + 1)] = pool["f"] * pool["r1"]
 
+        # Set MT pool parameters if active
         if self.is_mt_active:
             self.arr_c[3 * (n_p + 1)] = self.params.mt_pool["f"] * self.params.mt_pool["r1"]
 
-        # always expand to 3 dimensions (independent of sequential or parallel computation)
-        self.arr_c = self.arr_c[np.newaxis, np.newaxis, :, np.newaxis]
-        self.arr_c = np.repeat(self.arr_c, self.n_isochromats, axis=0)
+        # Expand to 3 dimensions: [n_isochromats, 1, size, 1]
+        self.arr_c = self.arr_c.unsqueeze(0).unsqueeze(0).unsqueeze(-1)
+        self.arr_c = self.arr_c.repeat(self.n_isochromats, 1, 1, 1)
 
-        # if parallel computation is activated, repeat matrix C n_offsets times along axis 0
+        # If parallel computation is activated, repeat vector C n_offsets times along the batch dimension
         if self.par_calc:
-            self.arr_c = np.repeat(self.arr_c, self.n_offsets, axis=0)
-
+            self.arr_c = self.arr_c.repeat(1, self.n_offsets, 1, 1)
+        
     def update_params(self, params: Params) -> None:
         """
         Updates matrix self.A according to given Params object.
