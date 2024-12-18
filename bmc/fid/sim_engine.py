@@ -44,17 +44,12 @@ class BMCSim(BMCTool):
         else:
             self.n_measure = self.n_offsets
 
-        
-        
-
-        # print(self.n_measure)
-        # print(self.params.options["max_pulse_samples"])
-
         self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
 
         self.t = np.array([])
         self.total_vec = None
+        self.events = []
 
         
 
@@ -64,10 +59,9 @@ class BMCSim(BMCTool):
         if block.adc is not None:
             
             start_time = self.t[-1] if self.t.size > 0 else 0
-            print(f'adc at {start_time:.4f}s')
+            self.events.append(f'adc at {start_time:.4f}s')
             time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * self.dt_adc
             self.t = np.append(self.t, time_array)
-            print(f'tsize: {self.t.size}')
 
             for step in range(self.params.options["max_pulse_samples"]):
                 self.m_out[:, :, current_adc] = np.squeeze(mag)
@@ -84,11 +78,9 @@ class BMCSim(BMCTool):
 
             if self.write_all_mag:
                 start_time = self.t[-1] if self.t.size > 0 else 0
-                print(f'rf at {start_time:.4f}s')
+                self.events.append(f'rf at {start_time:.4f}s')
                 time_array = start_time + np.arange(amp_.size) * dtp_
                 self.t = np.append(self.t, time_array)
-                print(f'tsize: {self.t.size}')
-                print(amp_.size)
 
             for i in range(amp_.size):
                 if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
@@ -123,11 +115,9 @@ class BMCSim(BMCTool):
 
             if self.write_all_mag:
                 start_time = self.t[-1] if self.t.size > 0 else 0
-                print(f'gz at {start_time:.4f}s')
+                self.events.append(f'gz at {start_time:.4f}s')
                 time_array = start_time + np.arange(amp_.size) * dtp_
                 self.t = np.append(self.t, time_array)
-                print(f'tsize: {self.t.size}')
-                print(amp_.size)
 
             for i in range(amp_.size):
                 
@@ -167,7 +157,6 @@ class BMCSim(BMCTool):
         current_adc = 0
         accum_phase = 0
         mag = self.m_init[np.newaxis, np.newaxis, :, np.newaxis] #extended to [n_isochromats, ...]
-        # print(mag.shape)
 
         try:
             block_events = self.seq.block_events
@@ -190,7 +179,7 @@ class BMCSim(BMCTool):
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
 
         self.m_out = self.m_out[:, :, :self.t.size]
-        print(self.m_out.shape)
+        print(self.events)
     
 
     def get_mag(self, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -214,20 +203,23 @@ class BMCSim(BMCTool):
             m_z = self.m_out[:, self.params.mz_loc + 1, :]
 
             
-            mz_total /= np.max(np.abs(mz_total)) if np.max(np.abs(mz_total)) != 0 else 1
-
             m_x_total = np.sum(m_x, axis=0)
             m_y_total = np.sum(m_y, axis=0)
-            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2))
+            m_z_total = np.sum(m_z, axis=0)
+
+            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+
+            m_z_total /= norm_factor if norm_factor != 0 else 1
+            
             m_x_total /= norm_factor if norm_factor != 0 else 1
             m_y_total /= norm_factor if norm_factor != 0 else 1
 
             m_trans_c = m_x + 1j * m_y
             m_trans_c_total = m_x_total + 1j * m_y_total
 
-            self.total_vec = np.vstack((m_x_total, m_y_total, mz_total)).T
+            self.total_vec = np.vstack((m_x_total, m_y_total, m_z_total)).T
 
-            return self.t, np.abs(m_z), abs(mz_total), m_trans_c, m_trans_c_total
+            return self.t, np.abs(m_z), abs(m_z_total), m_trans_c, m_trans_c_total
         
         else:
             
@@ -235,21 +227,23 @@ class BMCSim(BMCTool):
             m_y = self.m_out[:, n_total_pools, :]
             m_z = self.m_out[:, self.params.mz_loc, :]
 
-            mz_total = np.sum(m_z, axis=0)
-            mz_total /= np.max(np.abs(mz_total)) if np.max(np.abs(mz_total)) != 0 else 1
-
             m_x_total = np.sum(m_x, axis=0)
             m_y_total = np.sum(m_y, axis=0)
-            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2))
+            m_z_total = np.sum(m_z, axis=0)
+
+            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+
+            m_z_total /= norm_factor if norm_factor != 0 else 1
+            
             m_x_total /= norm_factor if norm_factor != 0 else 1
             m_y_total /= norm_factor if norm_factor != 0 else 1
 
             m_trans_c = m_x + 1j * m_y
             m_trans_c_total = m_x_total + 1j * m_y_total
 
-            self.total_vec = np.vstack((m_x_total, m_y_total, mz_total)).T
+            self.total_vec = np.vstack((m_x_total, m_y_total, m_z_total)).T
 
-            return self.t, np.abs(m_z), abs(mz_total), m_trans_c, m_trans_c_total
+            return self.t, np.abs(m_z), abs(m_z_total), m_trans_c, m_trans_c_total
     
 
 
@@ -258,8 +252,9 @@ class BMCSim(BMCTool):
         Returns the time array.
         """
         return self.t
+    
 
-    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, **addParams) -> None:
+    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, **addParams) -> None:
         """
         Animates the magnetization vector for all isochromats in a 3D plot.
         ----------
@@ -294,8 +289,19 @@ class BMCSim(BMCTool):
                  self.m_out[:, 1, :],
                  self.m_out[:, self.params.mz_loc, :]),
                  axis=2)
+        m_vec_total = np.stack(
+            (self.total_vec[:, 0],
+            self.total_vec[:, 1],
+            self.total_vec[:, 2]),
+            axis=1
+        ) if total_mag else None
 
-        m_vec_water = m_vec_water[:, ::step]  # Schrittweite anwenden
+        
+        
+        m_vec_water = m_vec_water[:, ::step]
+        m_vec_total = m_vec_total[::step]  # Schrittweite anwenden
+        middle_idx = np.where(self.z_positions == 0)[0][0]
+        m_vec_middle = m_vec_water[middle_idx] if total_mag else None
         render_params = {
             'quality': '-ql',
             'write': '',
@@ -323,64 +329,126 @@ class BMCSim(BMCTool):
                 vectors = []
                 paths = []
 
-                for i in range(isochromats):
-                    x_tracker = ValueTracker(m_vec_water[i, 0, 0] * scaling_array[0])
-                    y_tracker = ValueTracker(m_vec_water[i, 0, 1] * scaling_array[1])
-                    z_tracker = ValueTracker(m_vec_water[i, 0, 2] * scaling_array[2])
-                    trackers.append((x_tracker, y_tracker, z_tracker))
+                if total_mag:
+                    for i, vec in enumerate([m_vec_total, m_vec_middle]):
+                        colors_total_mag = [WHITE, PURE_GREEN]
+                        x_tracker = ValueTracker(vec[0, 0] * scaling_array[0])
+                        y_tracker = ValueTracker(vec[0, 1] * scaling_array[1])
+                        z_tracker = ValueTracker(vec[0, 2] * scaling_array[2])
+                        trackers.append((x_tracker, y_tracker, z_tracker))
 
-                    # Vektor erstellen
-                    vector = Vector(
-                        [x_tracker.get_value(), y_tracker.get_value(), z_tracker.get_value()],
-                        color=colors[i]
-                    )
+                        # Vektor erstellen
+                        vector = Vector(
+                            [x_tracker.get_value(), y_tracker.get_value(), z_tracker.get_value()],
+                            color=colors_total_mag[i]
+                        )
 
-                    def update_vector(v, x=x_tracker, y=y_tracker, z=z_tracker, col=colors[i]):
-                        v.become(Vector([x.get_value(), y.get_value(), z.get_value()], color=col))
+                        def update_vector(v, x=x_tracker, y=y_tracker, z=z_tracker, col=colors_total_mag[i]):
+                            v.become(Vector([x.get_value(), y.get_value(), z.get_value()], color=col))
 
-                    vector.add_updater(update_vector)
-                    vectors.append(vector)
+                        vector.add_updater(update_vector)
+                        vectors.append(vector)
 
-                    # Pfad hinzufügen, falls aktiviert
+                        # Pfad hinzufügen, falls aktiviert
+                        if track_path:
+                            path = TracedPath(vector.get_end, stroke_color=colors_total_mag[i], stroke_width=1)
+                            paths.append(path)
+
+                    self.add(axes, labels, *vectors)
                     if track_path:
-                        path = TracedPath(vector.get_end, stroke_color=colors[i], stroke_width=1)
-                        paths.append(path)
+                        self.add(*paths)
 
-                self.add(axes, labels, *vectors)
-                if track_path:
-                    self.add(*paths)
+                    self.set_camera_orientation(phi=65 * DEGREES, theta=135 * DEGREES)
 
-                self.set_camera_orientation(phi=65 * DEGREES, theta=135 * DEGREES)
+                    # Text für die Zeit
+                    if timing:
+                        decimal = Text("0", font_size=36)
+                        time_tracker = ValueTracker(0)
 
-                # Text für die Zeit
-                if timing:
-                    decimal = Text("0", font_size=36)
-                    time_tracker = ValueTracker(0)
+                        def update_decimal(d):
+                            current_index = int(time_tracker.get_value())
+                            current_time = time[current_index] if current_index < len(time) else time[-1]
+                            d.become(Text(f"t = {current_time:.4f} s", font_size=36))
+                            d.fix_in_frame()
+                            d.to_corner(UR).scale(0.7)
 
-                    def update_decimal(d):
-                        current_index = int(time_tracker.get_value())
-                        current_time = time[current_index] if current_index < len(time) else time[-1]
-                        d.become(Text(f"t = {current_time:.4f} s", font_size=36))
-                        d.fix_in_frame()
-                        d.to_corner(UR).scale(0.7)
+                        decimal.add_updater(update_decimal)
+                        self.add(decimal)
 
-                    decimal.add_updater(update_decimal)
-                    self.add(decimal)
+                    # Animation über die Zeit
+                    for t in range(1, len(time)):
+                        self.play(
+                            *[
+                                trackers[i][0].animate.set_value(vec[t, 0] * scaling_array[0]) for i, vec in enumerate([m_vec_total, m_vec_middle])
+                            ] + [
+                                trackers[i][1].animate.set_value(vec[t, 1] * scaling_array[1]) for i, vec in enumerate([m_vec_total, m_vec_middle])
+                            ] + [
+                                trackers[i][2].animate.set_value(vec[t, 2] * scaling_array[2]) for i, vec in enumerate([m_vec_total, m_vec_middle])
+                            ] + (
+                                [time_tracker.animate.set_value(t)] if timing else []
+                            ),
+                            run_time=run_time, rate_func=linear
+                        )
+                else:
 
-                # Animation über die Zeit
-                for t in range(1, len(time)):
-                    self.play(
-                        *[
-                            trackers[i][0].animate.set_value(m_vec_water[i, t, 0] * scaling_array[0]) for i in range(isochromats)
-                        ] + [
-                            trackers[i][1].animate.set_value(m_vec_water[i, t, 1] * scaling_array[1]) for i in range(isochromats)
-                        ] + [
-                            trackers[i][2].animate.set_value(m_vec_water[i, t, 2] * scaling_array[2]) for i in range(isochromats)
-                        ] + (
-                            [time_tracker.animate.set_value(t)] if timing else []
-                        ),
-                        run_time=run_time, rate_func=linear
-                    )
+                    for i in range(isochromats):
+                        x_tracker = ValueTracker(m_vec_water[i, 0, 0] * scaling_array[0])
+                        y_tracker = ValueTracker(m_vec_water[i, 0, 1] * scaling_array[1])
+                        z_tracker = ValueTracker(m_vec_water[i, 0, 2] * scaling_array[2])
+                        trackers.append((x_tracker, y_tracker, z_tracker))
+
+                        # Vektor erstellen
+                        vector = Vector(
+                            [x_tracker.get_value(), y_tracker.get_value(), z_tracker.get_value()],
+                            color=colors[i]
+                        )
+
+                        def update_vector(v, x=x_tracker, y=y_tracker, z=z_tracker, col=colors[i]):
+                            v.become(Vector([x.get_value(), y.get_value(), z.get_value()], color=col))
+
+                        vector.add_updater(update_vector)
+                        vectors.append(vector)
+
+                        # Pfad hinzufügen, falls aktiviert
+                        if track_path:
+                            path = TracedPath(vector.get_end, stroke_color=colors[i], stroke_width=1)
+                            paths.append(path)
+
+                    self.add(axes, labels, *vectors)
+                    if track_path:
+                        self.add(*paths)
+
+                    self.set_camera_orientation(phi=65 * DEGREES, theta=135 * DEGREES)
+
+                    # Text für die Zeit
+                    if timing:
+                        decimal = Text("0", font_size=36)
+                        time_tracker = ValueTracker(0)
+
+                        def update_decimal(d):
+                            current_index = int(time_tracker.get_value())
+                            current_time = time[current_index] if current_index < len(time) else time[-1]
+                            d.become(Text(f"t = {current_time:.4f} s", font_size=36))
+                            d.fix_in_frame()
+                            d.to_corner(UR).scale(0.7)
+
+                        decimal.add_updater(update_decimal)
+                        self.add(decimal)
+
+                    # Animation über die Zeit
+                    for t in range(1, len(time)):
+                        self.play(
+                            *[
+                                trackers[i][0].animate.set_value(m_vec_water[i, t, 0] * scaling_array[0]) for i in range(isochromats)
+                            ] + [
+                                trackers[i][1].animate.set_value(m_vec_water[i, t, 1] * scaling_array[1]) for i in range(isochromats)
+                            ] + [
+                                trackers[i][2].animate.set_value(m_vec_water[i, t, 2] * scaling_array[2]) for i in range(isochromats)
+                            ] + (
+                                [time_tracker.animate.set_value(t)] if timing else []
+                            ),
+                            run_time=run_time, rate_func=linear
+                        )
 
                 if ie:
                     self.interactive_embed()
