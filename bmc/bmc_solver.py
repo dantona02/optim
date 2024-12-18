@@ -2,10 +2,7 @@
 bmc_solver.py
     Definition of BlochMcConnellSolver class.
 """
-import math
-
 import numpy as np
-
 from bmc.params import Params
 
 
