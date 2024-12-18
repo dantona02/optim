@@ -133,7 +133,7 @@ class BlochMcConnellSolver:
         self._init_matrix_a()
         self._init_vector_c()
 
-    def update_matrix(self, rf_amp: float, rf_phase: np.ndarray, rf_freq: np.ndarray, grad_amp: float = 0) -> None:
+    def update_matrix(self, rf_amp: float, rf_phase: float, rf_freq: float, grad_amp: float = 0) -> None:
         """
         rf_phase and rf_freq might be floats not arrays
         Updates matrix self.A according to given parameters.
