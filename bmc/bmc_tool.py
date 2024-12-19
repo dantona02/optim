@@ -13,48 +13,51 @@ from tqdm import tqdm
 
 from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.params import Params
+import torch
+
+from bmc.utils.global_device import GLOBAL_DEVICE
 
 
-def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[np.ndarray, np.ndarray, float, float]:
+def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
     """
-    prep_rf_simulation Resamples the amplitude and phase of given rf event.
+    prep_rf_simulation Resamples the amplitude and phase of given RF event.
 
     Parameters
     ----------
     block : SimpleNamespace
         PyPulseq block event
     max_pulse_samples : int
-        Maximum number of samples for the rf pulse
+        Maximum number of samples for the RF pulse.
 
     Returns
     -------
-    Tuple[np.ndarray, np.ndarray, float, float]
-        Tuple of resampled amplitude, phase, time step and delay after pulse
+    Tuple[torch.Tensor, torch.Tensor, float, float]
+        Tuple of resampled amplitude, phase, time step, and delay after pulse.
 
     Raises
     ------
     Exception
-        If number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet)
+        If number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet).
     """
-    amp = np.abs(block.rf.signal)
-    ph = np.angle(block.rf.signal)
-    idx = np.argwhere(amp > 1e-6)
+    amp = torch.tensor(block.rf.signal, dtype=torch.float32, device=GLOBAL_DEVICE).abs()
+    ph = torch.tensor(np.angle(block.rf.signal), dtype=torch.float32, device=GLOBAL_DEVICE)
+    idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
 
     try:
-        rf_length = amp.size
-        dtp = block.rf.t[1] - block.rf.t[0]
-        delay_after_pulse = (rf_length - idx.size) * dtp
+        rf_length = amp.size(0)
+        dtp = float(block.rf.t[1] - block.rf.t[0])
+        delay_after_pulse = (rf_length - idx.size(0)) * dtp
     except AttributeError:
-        rf_length = amp.size
+        rf_length = amp.size(0)
         dtp = 1e-6
-        delay_after_pulse = (rf_length - idx.size) * dtp
+        delay_after_pulse = (rf_length - idx.size(0)) * dtp
 
     amp = amp[idx]
     ph = ph[idx]
-    n_unique = max(np.unique(amp).size, np.unique(ph).size)
+    n_unique = max(len(torch.unique(amp)), len(torch.unique(ph)))
 
     # block pulse for seq-files >= 1.4.0
-    if n_unique == 1 and amp.size ==2:
+    if n_unique == 1 and amp.size(0) == 2:
         amp_ = amp[0]
         ph_ = ph[0]
         dtp_ = dtp
@@ -62,10 +65,10 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
     elif n_unique == 1:
         amp_ = amp[0]
         ph_ = ph[0]
-        dtp_ = dtp * amp.size
+        dtp_ = dtp * amp.size(0)
     # shaped pulse
     elif n_unique > max_pulse_samples:
-        sample_factor = int(np.ceil(amp.size / max_pulse_samples))
+        sample_factor = int(torch.ceil(torch.tensor(amp.size(0) / max_pulse_samples, device=GLOBAL_DEVICE)))
         amp_ = amp[::sample_factor]
         ph_ = ph[::sample_factor]
         dtp_ = dtp * sample_factor
@@ -74,53 +77,53 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
 
     return amp_, ph_, dtp_, delay_after_pulse
 
-def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[np.ndarray, float, float]:
+def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[torch.Tensor, float, float]:
     """
-    prep_rf_simulation Resamples the amplitude and phase of given rf event.
+    prep_grad_simulation Resamples the amplitude of a gradient event.
 
     Parameters
     ----------
     block : SimpleNamespace
         PyPulseq block event
     max_pulse_samples : int
-        Maximum number of samples for the rf pulse
+        Maximum number of samples for the gradient waveform.
 
     Returns
     -------
-    Tuple[np.ndarray, float, float]
-        Tuple of resampled amplitude, phase, time step and delay after pulse
+    Tuple[torch.Tensor, float, float]
+        Tuple of resampled amplitude, time step, and delay after gradient.
 
     Raises
     ------
     Exception
-        If number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet)
+        If the number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet).
     """
-    amp = np.abs(block.gz.waveform)
-    idx = np.argwhere(amp > 1e-6)
+    amp = torch.tensor(block.gz.waveform, dtype=torch.float32, device=GLOBAL_DEVICE).abs()
+    idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
 
     try:
-        grad_length = amp.size
-        dtp = block.gz.tt[1] - block.gz.tt[0]
-        delay_after_grad = (grad_length - idx.size) * dtp
+        grad_length = amp.size(0)
+        dtp = float(block.gz.tt[1] - block.gz.tt[0])
+        delay_after_grad = (grad_length - idx.size(0)) * dtp
     except AttributeError:
-        grad_length = amp.size
+        grad_length = amp.size(0)
         dtp = 1e-6
-        delay_after_grad = (grad_length - idx.size) * dtp
+        delay_after_grad = (grad_length - idx.size(0)) * dtp
 
     amp = amp[idx]
-    n_unique = np.unique(amp).size #changed from max to np.unique
+    n_unique = torch.unique(amp).size(0)  # Changed from `np.unique` to `torch.unique`
 
     # block pulse for seq-files >= 1.4.0
-    if n_unique == 1 and amp.size ==2:
+    if n_unique == 1 and amp.size(0) == 2:
         amp_ = amp[0]
         dtp_ = dtp
     # block pulse for seq-files < 1.4.0
     elif n_unique == 1:
         amp_ = amp[0]
-        dtp_ = dtp * amp.size
+        dtp_ = dtp * amp.size(0)
     # shaped pulse
     elif n_unique > max_pulse_samples:
-        sample_factor = int(np.ceil(amp.size / max_pulse_samples))
+        sample_factor = int(torch.ceil(torch.tensor(amp.size(0) / max_pulse_samples, device=GLOBAL_DEVICE)))
         amp_ = amp[::sample_factor]
         dtp_ = dtp * sample_factor
     else:

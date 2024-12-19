@@ -5,6 +5,7 @@ bmc_solver.py
 import numpy as np
 from bmc.params import Params
 import torch
+from bmc.utils.global_device import GLOBAL_DEVICE
 
 
 class BlochMcConnellSolver:
@@ -26,7 +27,7 @@ class BlochMcConnellSolver:
         """
         self.params: Params = params
         self.n_offsets: int = n_offsets
-        self.z_positions: torch.Tensor = z_positions
+        self.z_positions: torch.Tensor = z_positions.to(GLOBAL_DEVICE)
         self.n_isochromats: int = len(z_positions)
 
         self.par_calc: bool = params.options["par_calc"]
@@ -46,7 +47,7 @@ class BlochMcConnellSolver:
         Initialize self.arr_a with all parameters from self.params.
         """
         n_p = self.n_pools
-        self.arr_a = torch.zeros([self.size, self.size], dtype=torch.float64)
+        self.arr_a = torch.zeros([self.size, self.size], dtype=torch.float32, device=GLOBAL_DEVICE)
 
         # Set mt_pool parameters
         k_ac = 0.0
@@ -101,7 +102,7 @@ class BlochMcConnellSolver:
         Initialize vector self.C with all parameters from self.params.
         """
         n_p = self.n_pools
-        self.arr_c = torch.zeros([self.size], dtype=torch.float64)
+        self.arr_c = torch.zeros([self.size], dtype=torch.float32, device=GLOBAL_DEVICE)
 
         # Set water pool parameters
         self.arr_c[(n_p + 1) * 2] = self.params.water_pool["f"] * self.params.water_pool["r1"]
@@ -132,71 +133,75 @@ class BlochMcConnellSolver:
         self._init_matrix_a()
         self._init_vector_c()
 
-    def update_matrix(self, rf_amp: float, rf_phase: np.ndarray, rf_freq: np.ndarray, grad_amp: float = 0) -> None:
+    def update_matrix(self, rf_amp: float, rf_phase: float, rf_freq: float, grad_amp: float = 0) -> None:
         """
-        rf_phase and rf_freq might be floats not arrays
         Updates matrix self.A according to given parameters.
-        :param rf_amp: amplitude of current step (e.g. pulse fragment)
-        :param rf_phase: phase of current step (e.g. pulse fragment)
-        :param rf_freq: frequency value of current step (e.g. pulse fragment)
+
+        Parameters
+        ----------
+        rf_amp : float
+            Amplitude of current step (e.g. pulse fragment).
+        rf_phase : float
+            Phase of current step (e.g. pulse fragment).
+        rf_freq : float
+            Frequency value of current step (e.g. pulse fragment).
+        grad_amp : float, optional
+            Gradient amplitude for dephasing. Default is 0.
         """
         j = self.first_dim  # size of first dimension (=1 for sequential, n_offsets for parallel)
         n_p = self.n_pools
-        grad_term = 2 * np.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
+        grad_term = 2 * torch.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
 
-        # set dw0 due to b0_inhomogeneity
-        self.arr_a[:, :, 0, 1 + n_p] = [self.dw0] * j
-        self.arr_a[:, :, 1 + n_p, 0] = [-1 * self.dw0] * j
+        # Set dw0 due to b0 inhomogeneity
+        self.arr_a[:, :, 0, 1 + n_p] = self.dw0
+        self.arr_a[:, :, 1 + n_p, 0] = -self.dw0
 
-        #set dw_grad for water pool
-        self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j??
+        # Set gradient terms for water pool
+        self.arr_a[:, :, 0, 1 + n_p] += grad_term
         self.arr_a[:, :, 1 + n_p, 0] -= grad_term
 
-        # calculate omega_1
-        rf_amp_2pi = rf_amp * 2 * np.pi * self.params.scanner["rel_b1"]
-        rf_amp_2pi_sin = rf_amp_2pi * np.sin(rf_phase)
-        rf_amp_2pi_cos = rf_amp_2pi * np.cos(rf_phase)
+        # Calculate omega_1
+        rf_amp_2pi = rf_amp * 2 * torch.pi * self.params.scanner["rel_b1"]
+        rf_amp_2pi_sin = rf_amp_2pi * torch.sin(torch.tensor(rf_phase, dtype=torch.float32, device=GLOBAL_DEVICE))
+        rf_amp_2pi_cos = rf_amp_2pi * torch.cos(torch.tensor(rf_phase, dtype=torch.float32, device=GLOBAL_DEVICE))
 
-        # set omega_1 for water_pool
+        # Set omega_1 for water pool
         self.arr_a[:, :, 0, 2 * (n_p + 1)] = -rf_amp_2pi_sin
         self.arr_a[:, :, 2 * (n_p + 1), 0] = rf_amp_2pi_sin
-
         self.arr_a[:, :, n_p + 1, 2 * (n_p + 1)] = rf_amp_2pi_cos
         self.arr_a[:, :, 2 * (n_p + 1), n_p + 1] = -rf_amp_2pi_cos
 
-        # set omega_1 for cest pools
+        # Set omega_1 for CEST pools
         for i in range(1, n_p + 1):
             self.arr_a[:, :, i, i + 2 * (n_p + 1)] = -rf_amp_2pi_sin
             self.arr_a[:, :, i + 2 * (n_p + 1), i] = rf_amp_2pi_sin
-
             self.arr_a[:, :, n_p + 1 + i, i + 2 * (n_p + 1)] = rf_amp_2pi_cos
             self.arr_a[:, :, i + 2 * (n_p + 1), n_p + 1 + i] = -rf_amp_2pi_cos
 
-        # set off-resonance terms for water pool, rf_freq is frequency offset from water
-        rf_freq_2pi = rf_freq * 2 * np.pi
+        # Set off-resonance terms for water pool
+        rf_freq_2pi = rf_freq * 2 * torch.pi
         self.arr_a[:, :, 0, 1 + n_p] += rf_freq_2pi
         self.arr_a[:, :, 1 + n_p, 0] -= rf_freq_2pi
 
-        
-
-        # set off-resonance terms for cest pools
+        # Set off-resonance terms for CEST pools
         for i in range(1, n_p + 1):
             dwi = self.params.cest_pools[i - 1]["dw"] * self.w0 - (rf_freq_2pi + self.dw0)
             self.arr_a[:, :, i, i + n_p + 1] = -dwi
             self.arr_a[:, :, i + n_p + 1, i] = dwi
 
+            # Add gradient terms for CEST pools
             self.arr_a[:, :, i, i + n_p + 1] -= grad_term
             self.arr_a[:, :, i + n_p + 1, i] += grad_term
 
-        # mt_pool
+        # MT pool (if active)
         if self.is_mt_active:
             self.arr_a[:, :, 3 * (n_p + 1), 3 * (n_p + 1)] = (
                 -self.params.mt_pool["r1"]
                 - self.params.mt_pool["k"]
-                - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0) # implementation of gradient needs to be implemented
+                - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0)
             )
 
-    def solve_equation(self, mag: np.ndarray, dtp: float) -> np.ndarray:
+    def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
         """
         Solves one step of BMC equations for multiple Isochromaten using the Padé approximation.
         :param mag: magnetization vector before current step (shape: [n_isochromats, size, 1])
@@ -204,22 +209,27 @@ class BlochMcConnellSolver:
         :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
         """
         n_iter = 6  # number of iterations
-        arr_a = self.arr_a
-        arr_c = self.arr_c
-        a_inv_t = np.matmul(np.linalg.pinv(arr_a), arr_c)  # Shape: [n_isochromats, n_offsets, size, 1]
+        arr_a = self.arr_a.to(GLOBAL_DEVICE, dtype=torch.float32)
+        arr_c = self.arr_c.to(GLOBAL_DEVICE, dtype=torch.float32)
+        mag = mag.to(GLOBAL_DEVICE, dtype=torch.float32)
+
+        # Compute `a_inv_t` for all Isochromaten
+        a_inv_t = torch.matmul(torch.linalg.pinv(arr_a.cpu()), arr_c.cpu()).to(GLOBAL_DEVICE) # Shape: [n_isochromats, n_offsets, size, 1]
 
         # Compute `a_t` for all Isochromaten
         a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
 
         # Normalize `a_t` to avoid numerical instability
-        _, inf_exp = np.frexp(np.linalg.norm(a_t, ord=np.inf, axis=(2, 3)))
-        j = np.maximum(0, inf_exp)
-        a_t /= np.power(2, j[:, :, np.newaxis, np.newaxis])  # Normalize across batch and offset
+        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3))
+        _, exp_shift = torch.frexp(max_norm.cpu())
+        exp_shift = torch.clamp(exp_shift, min=0)
+        exp_shift = exp_shift.to(GLOBAL_DEVICE)
+        a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
 
         # Initialize Padé approximation
-        identity = np.eye(arr_a.shape[-1])[np.newaxis, np.newaxis, :, :]
-        identity = np.repeat(identity, arr_a.shape[0], axis=0)
-        x = a_t.copy()
+        identity = torch.eye(arr_a.shape[-1], dtype=torch.float32, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
+        identity = identity.expand_as(arr_a)
+        x = a_t.clone()
         c = 0.5
         n = identity + c * a_t
         d = identity - c * a_t
@@ -227,19 +237,22 @@ class BlochMcConnellSolver:
         p = True
         for k in range(2, n_iter + 1):
             c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-            x = np.matmul(a_t, x)
+            x = torch.matmul(a_t, x)
             c_x = c * x
-            n += c_x
-            d += c_x if p else -c_x
+            n = n + c_x
+            if p:
+                d = d + c_x
+            else:
+                d = d - c_x
             p = not p
 
         # Solve for the matrix exponential
-        f = np.matmul(np.linalg.pinv(d), n)
-        for _ in range(j.max()):
-            f = np.matmul(f, f)
+        f = torch.matmul(torch.linalg.pinv(d.cpu()), n.cpu()).to(GLOBAL_DEVICE)
+        for _ in range(int(exp_shift.max())):
+            f = torch.matmul(f, f)
 
         # Compute the final magnetization
-        mag = np.matmul(f, mag + a_inv_t) - a_inv_t
+        mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
         return mag
 
 
