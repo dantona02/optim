@@ -9,11 +9,11 @@ attrs==24.2.0
 babel==2.16.0
 beautifulsoup4==4.12.3
 bleach==6.2.0
--e git+ssh://git@github.com/dantona02/optim.git@9cc62b710a5b5fb71539e1d0abcd48502e97fec2#egg=bmc
+-e git+ssh://git@github.com/dantona02/optim.git@2aa7e61b03696b410c4f6623c1ee0baff38872ef#egg=bmc
 Brotli @ file:///Users/runner/miniforge3/conda-bld/brotli-split_1725267563793/work
 build @ file:///home/conda/feedstock_root/build_artifacts/python-build_1728263384570/work
 CacheControl @ file:///home/conda/feedstock_root/build_artifacts/cachecontrol-split_1730805028284/work
-certifi @ file:///home/conda/feedstock_root/build_artifacts/certifi_1725278078093/work/certifi
+certifi @ file:///home/conda/feedstock_root/build_artifacts/certifi_1734380492396/work/certifi
 cffi @ file:///Users/runner/miniforge3/conda-bld/cffi_1725560551097/work
 charset-normalizer @ file:///home/conda/feedstock_root/build_artifacts/charset-normalizer_1728479282467/work
 cleo @ file:///home/conda/feedstock_root/build_artifacts/cleo_1732012286593/work
@@ -39,6 +39,7 @@ fonttools==4.55.0
 fqdn==1.5.1
 future @ file:///home/conda/feedstock_root/build_artifacts/future_1708610096684/work
 glcontext @ file:///Users/runner/miniforge3/conda-bld/glcontext_1725374135523/work
+gmpy2 @ file:///Users/runner/miniforge3/conda-bld/gmpy2_1733462580180/work
 h11==0.14.0
 h2 @ file:///home/conda/feedstock_root/build_artifacts/h2_1634280454336/work
 hpack==4.0.0
@@ -56,7 +57,7 @@ isoduration==20.11.0
 isosurfaces @ file:///home/conda/feedstock_root/build_artifacts/isosurfaces_1709087510374/work
 jaraco.classes @ file:///home/conda/feedstock_root/build_artifacts/jaraco.classes_1713939306738/work
 jedi==0.19.2
-Jinja2==3.1.4
+Jinja2 @ file:///home/conda/feedstock_root/build_artifacts/jinja2_1733217336947/work
 json5==0.9.28
 jsonpointer==3.0.0
 jsonschema==4.23.0
@@ -78,7 +79,7 @@ manim @ file:///home/conda/feedstock_root/build_artifacts/manim_1714385482207/wo
 ManimPango @ file:///Users/runner/miniforge3/conda-bld/manimpango_1726487359378/work
 mapbox_earcut @ file:///Users/runner/miniforge3/conda-bld/mapbox_earcut_1721669914964/work
 markdown-it-py @ file:///home/conda/feedstock_root/build_artifacts/markdown-it-py_1686175045316/work
-MarkupSafe==3.0.2
+MarkupSafe @ file:///Users/runner/miniforge3/conda-bld/markupsafe_1733219682943/work
 matplotlib==3.9.2
 matplotlib-inline==0.1.7
 mdurl @ file:///home/conda/feedstock_root/build_artifacts/mdurl_1704317613764/work
@@ -86,6 +87,7 @@ mistune==3.0.2
 moderngl @ file:///Users/runner/miniforge3/conda-bld/moderngl_1727269623879/work
 moderngl-window @ file:///home/conda/feedstock_root/build_artifacts/moderngl-window_1640877011710/work
 more-itertools @ file:///home/conda/feedstock_root/build_artifacts/more-itertools_1725630081114/work
+mpmath @ file:///home/conda/feedstock_root/build_artifacts/mpmath_1733302684489/work
 msgpack @ file:///Users/runner/miniforge3/conda-bld/msgpack-python_1725975032735/work
 multipledispatch @ file:///home/conda/feedstock_root/build_artifacts/multipledispatch_1721907546485/work
 nbclient==0.10.0
@@ -95,7 +97,7 @@ nest-asyncio==1.6.0
 networkx @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_networkx_1731521053/work
 notebook_shim==0.2.4
 numba==0.60.0
-numpy==1.26.4
+numpy @ file:///Users/runner/miniforge3/conda-bld/numpy_1707225640867/work/dist/numpy-1.26.4-cp311-cp311-macosx_11_0_arm64.whl#sha256=b62b8b824024855c3eb209bd45bfcf60bc9a11b94cbf9d5b7b25dc503021e672
 overrides==7.7.0
 packaging @ file:///home/conda/feedstock_root/build_artifacts/packaging_1731802491770/work
 pandocfilters==1.5.1
@@ -148,10 +150,14 @@ soupsieve==2.6
 srt @ file:///Users/runner/miniforge3/conda-bld/srt_1695880384539/work
 stack-data==0.6.3
 svgelements @ file:///home/conda/feedstock_root/build_artifacts/svgelements_1692252260255/work
+sympy @ file:///home/conda/feedstock_root/build_artifacts/sympy_1727529700862/work
 terminado==0.18.1
 tinycss2==1.4.0
 tomli @ file:///home/conda/feedstock_root/build_artifacts/tomli_1732988158705/work
 tomlkit @ file:///home/conda/feedstock_root/build_artifacts/tomlkit_1723631480657/work
+torch==2.2.2
+torchaudio==2.2.2
+torchvision==0.17.2
 tornado==6.4.1
 tqdm==4.67.0
 traitlets==5.14.3
