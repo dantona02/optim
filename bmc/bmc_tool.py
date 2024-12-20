@@ -38,9 +38,10 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
     ------
     Exception
         If number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet).
+
     """
-    amp = torch.tensor(block.rf.signal, dtype=torch.float32, device=GLOBAL_DEVICE).abs()
-    ph = torch.tensor(np.angle(block.rf.signal), dtype=torch.float32, device=GLOBAL_DEVICE)
+    amp = torch.tensor(block.rf.signal, dtype=torch.complex64, device=GLOBAL_DEVICE).abs()
+    ph = torch.angle(torch.tensor(block.rf.signal, dtype=torch.complex64, device=GLOBAL_DEVICE))
     idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
 
     try:
