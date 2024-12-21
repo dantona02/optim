@@ -1,7 +1,10 @@
 from pathlib import Path
 import numpy as np
 from tqdm import tqdm
+import os
+import time
 
+from datetime import timedelta
 from typing import Tuple, Union
 from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.bmc_tool import BMCTool
@@ -10,6 +13,8 @@ from bmc.params import Params
 from IPython import get_ipython
 from manim import *
 from manim.opengl import *
+
+from bmc.utils.webhook import DiscordNotifier
 
 
 class BMCSim(BMCTool):
@@ -168,11 +173,53 @@ class BMCSim(BMCTool):
         else:
             loop_block_events = range(1, len(block_events) + 1)
 
+        webhook_url = "https://discord.com/api/webhooks/1319826840747245639/jeioX8DeZmynOv2Fatz5nB3F4-MMx3dCnMoM9Uit9c0yOtOuEvmlMpiE_MCDEXxlbkMg"
+        notifier = DiscordNotifier(webhook_url)
+        seq_filename = os.path.basename(self.seq_file) 
+        n_cest_pools = len(self.params.cest_pools)
+        total_blocks = len(block_events)
+
+        initial_table = (
+            "## __Simulation started__ 🚀\n"
+            f"Sequence: _{seq_filename}_\n"
+            f"N-CEST: {n_cest_pools}\n"
+            f"N-Iso: {self.n_isochromats}\n"
+            "```\n"
+            "+----------------+--------------+------------+\n"
+            "| Step           | Progress (%) | Status     |\n"
+            "+----------------+--------------+------------+\n"
+            f"| {0}/{total_blocks:<12} | {0:<12.2f} | {'Started':<10} |\n"
+            "+----------------+--------------+------------+\n"
+            "```"
+        )
+        notifier.send_initial_message(initial_table)
+        
+       
         # code for pypulseq >= 1.4.0:
+        
         try:
-            for block_event in loop_block_events:
+            start_time = time.time()
+            for i, block_event in enumerate(loop_block_events, start=1):
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+
+                # Calculate progress and update the status
+                progress = (i / total_blocks) * 100
+                status_message = (
+                    
+                    f"## __Simulation running__ 🔄\n"
+                    f"Sequence: _{seq_filename}_\n"
+                    f"N-CEST: {n_cest_pools}\n"
+                    f"N-Iso: {self.n_isochromats}\n"
+                    "```\n"
+                    "+----------------+--------------+------------+\n"
+                    "| Step           | Progress (%) | Status     |\n"
+                    "+----------------+--------------+------------+\n"
+                    f"| {i}/{total_blocks:<12} | {progress:<12.2f} | {'Running':<10} |\n"
+                    "+----------------+--------------+------------+\n"
+                    "```"
+                )
+                notifier.update_message(status_message)
         except AttributeError:
             for block_event in loop_block_events:
                 block = self.seq.get_block(block_event)
@@ -180,6 +227,24 @@ class BMCSim(BMCTool):
 
         self.m_out = self.m_out[:, :, :self.t.size]
         print(self.events)
+
+        end_time = time.time()
+        elapsed_time = timedelta(seconds=end_time - start_time)
+
+        notifier.update_message(
+            f"## __Simulation completed__ ✅\n"
+            f"Sequence: _{seq_filename}_\n"
+            f"N-CEST: {n_cest_pools}\n"
+            f"N-Iso: {self.n_isochromats}\n"
+            "```\n"
+            "+----------------+--------------+------------+\n"
+            "| Step           | Progress (%) | Status     |\n"
+            "+----------------+--------------+------------+\n"
+            f"| {total_blocks}/{total_blocks:<12} | {100:<12.2f} | {'Completed':<10} |\n"
+            "+----------------+--------------+------------+\n"
+            f"Duration: {elapsed_time}\n"
+            "```"
+        )
     
 
     def get_mag(self, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
