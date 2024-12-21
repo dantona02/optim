@@ -31,11 +31,10 @@ class BMCSim(BMCTool):
 
         self.n_measure = int(self.defs["num_meas"]) if "num_meas" in self.defs else self.n_offsets
 
-        # Torch-Tensor initialisieren
         self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float32, device=GLOBAL_DEVICE)
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
 
-        self.t = torch.tensor([], dtype=torch.float32, device=GLOBAL_DEVICE)  # Zeit als Torch-Tensor
+        self.t = torch.tensor([], dtype=torch.float32, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
 
@@ -155,12 +154,11 @@ class BMCSim(BMCTool):
         current_adc = 0
         accum_phase = 0
 
-        # Konvertiere m_init von NumPy zu Torch
         mag = torch.tensor(
             self.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
             dtype=torch.float32,
             device=GLOBAL_DEVICE
-        )  # Erweiterung zu [n_isochromats, ...]
+        )
 
         try:
             block_events = self.seq.block_events
@@ -172,7 +170,6 @@ class BMCSim(BMCTool):
         else:
             loop_block_events = range(1, len(block_events) + 1)
 
-        # Verarbeite die Sequenzblöcke
         try:
             for block_event in loop_block_events:
                 block = self.seq.get_block(block_event)
@@ -187,68 +184,65 @@ class BMCSim(BMCTool):
         print(self.events)
     
 
-    def get_mag(self, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def get_mag(self, return_cest_pool: bool = False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Rturns the complex transverse magnetization of water pool or ONE cest pool. No implementation for MT pools.
-        If return_cest_pool is True, only returns magnetization of the first cest pool.
+        Returns the complex transverse magnetization of water pool or ONE CEST pool. No implementation for MT pools.
+        If return_cest_pool is True, only returns magnetization of the first CEST pool.
         ----------
         Parameters
         ----------
         return_zmag: bool, optional
             If True, returns z-magnetization
         return_cest_pool: bool, optional
-            If True, returns magnetization of the first cest pool
+            If True, returns magnetization of the first CEST pool
         """
         n_total_pools = len(self.params.cest_pools) + 1
 
         if return_cest_pool and self.params.cest_pools:
 
             m_x = self.m_out[:, n_total_pools + 1, :]
-            m_y =self.m_out[:, 1, :]
+            m_y = self.m_out[:, 1, :]
             m_z = self.m_out[:, self.params.mz_loc + 1, :]
 
-            
-            m_x_total = np.sum(m_x, axis=0)
-            m_y_total = np.sum(m_y, axis=0)
-            m_z_total = np.sum(m_z, axis=0)
+            m_x_total = torch.sum(m_x, dim=0)
+            m_y_total = torch.sum(m_y, dim=0)
+            m_z_total = torch.sum(m_z, dim=0)
 
-            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+            norm_factor = torch.max(torch.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
 
             m_z_total /= norm_factor if norm_factor != 0 else 1
-            
             m_x_total /= norm_factor if norm_factor != 0 else 1
             m_y_total /= norm_factor if norm_factor != 0 else 1
 
             m_trans_c = m_x + 1j * m_y
             m_trans_c_total = m_x_total + 1j * m_y_total
 
-            self.total_vec = np.vstack((m_x_total, m_y_total, m_z_total)).T
+            self.total_vec = torch.stack((m_x_total, m_y_total, m_z_total), dim=-1)
 
-            return self.t, np.abs(m_z), abs(m_z_total), m_trans_c, m_trans_c_total
-        
+            return self.t, torch.abs(m_z), torch.abs(m_z_total), m_trans_c, m_trans_c_total
+
         else:
-            
+
             m_x = self.m_out[:, 0, :]
             m_y = self.m_out[:, n_total_pools, :]
             m_z = self.m_out[:, self.params.mz_loc, :]
 
-            m_x_total = np.sum(m_x, axis=0)
-            m_y_total = np.sum(m_y, axis=0)
-            m_z_total = np.sum(m_z, axis=0)
+            m_x_total = torch.sum(m_x, dim=0)
+            m_y_total = torch.sum(m_y, dim=0)
+            m_z_total = torch.sum(m_z, dim=0)
 
-            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+            norm_factor = torch.max(torch.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
 
             m_z_total /= norm_factor if norm_factor != 0 else 1
-            
             m_x_total /= norm_factor if norm_factor != 0 else 1
             m_y_total /= norm_factor if norm_factor != 0 else 1
 
             m_trans_c = m_x + 1j * m_y
             m_trans_c_total = m_x_total + 1j * m_y_total
 
-            self.total_vec = np.vstack((m_x_total, m_y_total, m_z_total)).T
+            self.total_vec = torch.stack((m_x_total, m_y_total, m_z_total), dim=-1)
 
-            return self.t, np.abs(m_z), abs(m_z_total), m_trans_c, m_trans_c_total
+            return self.t, torch.abs(m_z), torch.abs(m_z_total), m_trans_c, m_trans_c_total
     
 
 
@@ -277,7 +271,10 @@ class BMCSim(BMCTool):
             Adds the current simulation time to the corner of the animation.
         """
 
-        time = self.t[::step]
+        time = self.t[::step].cpu()
+        self.m_out = self.m_out.cpu()
+        self.total_vec = self.total_vec.cpu()
+        self.z_positions = self.z_positions.cpu()
         isochromats = self.n_isochromats
 
         # Magnetisierung für Wasserpools vorbereiten

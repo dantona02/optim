@@ -114,9 +114,9 @@ def simulate(config_file: Union[str, Path],
         time, m_z, m_z_total, m_c, m_c_total = sim.get_mag()
 
         if return_zmag:
-            plot_sim(m_out=[m_z, m_z_total], time=time, plt_range=plt_range, iso_select=iso_select, **kwargs)
+            plot_sim(m_out=[m_z.cpu(), m_z_total.cpu()], time=time.cpu(), plt_range=plt_range, iso_select=iso_select, **kwargs)
         else:
-            plot_sim(m_out=[m_c, m_c_total], time=time, plt_range=plt_range, iso_select=iso_select, **kwargs)
+            plot_sim(m_out=[m_c.cpu(), m_c_total.cpu()], time=time.cpu(), plt_range=plt_range, iso_select=iso_select, **kwargs)
 
     return sim
 

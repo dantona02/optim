@@ -209,21 +209,22 @@ class BlochMcConnellSolver:
         :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
         """
         n_iter = 6  # number of iterations
-        arr_a = self.arr_a.to(GLOBAL_DEVICE, dtype=torch.float32)
-        arr_c = self.arr_c.to(GLOBAL_DEVICE, dtype=torch.float32)
-        mag = mag.to(GLOBAL_DEVICE, dtype=torch.float32)
+        arr_a = self.arr_a.to(dtype=torch.float32)
+        arr_c = self.arr_c.to(dtype=torch.float32)
 
         # Compute `a_inv_t` for all Isochromaten
-        a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c).to(GLOBAL_DEVICE) # Shape: [n_isochromats, n_offsets, size, 1]
+        a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c) # Shape: [n_isochromats, n_offsets, size, 1]
 
         # Compute `a_t` for all Isochromaten
         a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
 
+        
+
         # Normalize `a_t` to avoid numerical instability
-        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3)).to(GLOBAL_DEVICE)
+        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3))
         _, exp_shift = torch.frexp(max_norm)
         exp_shift = torch.clamp(exp_shift, min=0)
-        exp_shift = exp_shift.to(GLOBAL_DEVICE)
+        exp_shift = exp_shift
         a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
 
         # Initialize Padé approximation
@@ -247,7 +248,7 @@ class BlochMcConnellSolver:
             p = not p
 
         # Solve for the matrix exponential
-        f = torch.matmul(torch.linalg.pinv(d), n).to(GLOBAL_DEVICE)
+        f = torch.matmul(torch.linalg.pinv(d), n)
         for _ in range(int(exp_shift.max())):
             f = torch.matmul(f, f)
 
