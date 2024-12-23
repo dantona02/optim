@@ -125,7 +125,7 @@ class DiscordNotifier:
         """
         embed = {
             "title": "Simulation failed ❌",
-            "description": f"Error: {str(error_message)}",
+            "description": f"Error: `{str(error_message)}`",
             "color": 0xff0000,
             "fields": [
                 {"name": "Sequence", "value": f"_{self.seq_filename}_", "inline": False},
