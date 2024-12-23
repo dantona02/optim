@@ -241,7 +241,8 @@ def plot_sim(
             ".--",                    # Punkte mit gestrichelter Linie
             color=hex_colors[idx], 
             label=f"Iso {idx - center_idx}",
-            markersize=4
+            markersize=4,
+            linewidth=.6
         )
     # Der zweite Vektor wird immer schwarz geplottet
     ax1.plot(
@@ -250,7 +251,8 @@ def plot_sim(
         ".--", 
         color="black", 
         label="Second Vector",
-        markersize=4
+        markersize=4,
+        linewidth=.6
     )
     ax1.set_title(title_signal)
     ax1.set_xlabel(x_label)
@@ -266,7 +268,8 @@ def plot_sim(
             ".--",                    # Punkte mit gestrichelter Linie
             color=hex_colors[idx], 
             label=f"Iso {idx - center_idx}",
-            markersize=4
+            markersize=4,
+            linewidth=.6
         )
     # Der zweite Vektor wird immer schwarz geplottet
     ax2.plot(
@@ -275,7 +278,8 @@ def plot_sim(
         ".--", 
         color="black", 
         label="Second Vector",
-        markersize=4
+        markersize=4,
+        linewidth=.6
     )
     ax2.set_title(title_phase)
     ax2.set_xlabel(x_label)

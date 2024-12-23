@@ -37,7 +37,7 @@ class BMCSim(BMCTool):
         self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float32, device=GLOBAL_DEVICE)
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
 
-        self.t = torch.tensor([], dtype=torch.float32, device=GLOBAL_DEVICE)
+        self.t = torch.tensor([0], dtype=torch.float32, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
 
@@ -69,83 +69,118 @@ class BMCSim(BMCTool):
         mag : torch.Tensor
             Updated magnetization vector.
         """
+
+        self.m_out[:, :, 0] = mag.squeeze()
+
+        # ADC
         if block.adc is not None:
-            start_time = self.t[-1].item() if self.t.numel() > 0 else 0
+            start_time = self.t[-1].item()
             self.events.append(f'adc at {start_time:.4f}s')
-            time_array = start_time + torch.arange(self.params.options["max_pulse_samples"], dtype=torch.float32, device=GLOBAL_DEVICE) * self.dt_adc
+            time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * self.dt_adc
             self.t = torch.cat((self.t, time_array))
 
-            for step in range(self.params.options["max_pulse_samples"]):
+            for step in range(len(time_array)):
+                self.bm_solver.update_matrix(0, 0, 0)  # No RF amplitude, phase, or frequency
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
                 self.m_out[:, :, current_adc] = mag.squeeze()
                 accum_phase = 0
                 current_adc += 1
-
-                self.bm_solver.update_matrix(0, 0, 0)  # No RF amplitude, phase, or frequency
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
             
-            # RF pulse
+        # RF pulse
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
             if self.write_all_mag:
-                start_time = self.t[-1].item() if self.t.numel() > 0 else 0
+                start_time = self.t[-1].item()
                 self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + torch.arange(amp_.numel(), dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
-
-            for i in range(amp_.numel()):
-                if self.write_all_mag:
+                for i in range(amp_.numel()):
+                    self.bm_solver.update_matrix(
+                        rf_amp=amp_[i].item(),
+                        rf_phase=-ph_[i].item() + block.rf.phase_offset - accum_phase,
+                        rf_freq=block.rf.freq_offset,
+                    )
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
-
-                self.bm_solver.update_matrix(
-                    rf_amp=amp_[i].item(),
-                    rf_phase=-ph_[i].item() + block.rf.phase_offset - accum_phase,
-                    rf_freq=block.rf.freq_offset,
-                )
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+            else:
+                for i in range(amp_.numel()):
+                    self.bm_solver.update_matrix(
+                        rf_amp=amp_[i].item(),
+                        rf_phase=-ph_[i].item() + block.rf.phase_offset - accum_phase,
+                        rf_freq=block.rf.freq_offset,
+                    )
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                    current_adc += 1
                 
 
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
                 if self.write_all_mag:
-                    start_time = self.t[-1].item() if self.t.numel() > 0 else 0
-                    time_array = start_time + torch.arange(1, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_pulse
+                    start_time = self.t[-1].item()
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_pulse
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
             phase_degree = dtp_ * amp_.numel() * 360 * block.rf.freq_offset
             phase_degree %= 360
             accum_phase += phase_degree / 180 * torch.pi
-            
+
+        # spoiling gradient
         elif block.gz is not None:
             amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
 
             if self.write_all_mag:
-                start_time = self.t[-1].item() if self.t.numel() > 0 else 0
+                start_time = self.t[-1].item()
                 self.events.append(f'gz at {start_time:.4f}s')
-                time_array = start_time + torch.arange(amp_.numel(), dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
-
-            for i in range(amp_.numel()):
-                if self.write_all_mag:
+                for i in range(amp_.numel()):
+                    self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i].item())
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
-
-                self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i].item())
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+            else:
+                for i in range(amp_.numel()):
+                    self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i].item())
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                    current_adc += 1
 
             if delay_after_grad > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
                 if self.write_all_mag:
-                    start_time = self.t[-1].item() if self.t.numel() > 0 else 0
-                    time_array = start_time + torch.arange(1, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_grad
+                    start_time = self.t[-1].item()
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_grad
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
+
+        # delay
+        elif hasattr(block, "block_duration") and block.block_duration != "0":
+            delay = block.block_duration
+            sample_factor_delay = int(self.params.options["max_pulse_samples"] / 10)
+            dt_delay = delay / sample_factor_delay
+            if self.write_all_mag:
+                start_time = self.t[-1].item()
+                self.events.append(f'rf at {start_time:.4f}s')
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                self.t = torch.cat((self.t, time_array))
+
+                for step in range(len(time_array)):
+                    self.bm_solver.update_matrix(0, 0, 0)
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dt_delay)
+                    self.m_out[:, :, current_adc] = mag.squeeze()
+                    current_adc += 1
+            else:
+                self.bm_solver.update_matrix(0, 0, 0)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay)
+
+        else:
+            raise Exception("Unknown case")
 
         return current_adc, accum_phase, mag
 
@@ -156,7 +191,7 @@ class BMCSim(BMCTool):
         if self.n_offsets != self.n_measure:
             self.run_m0_scan = True
 
-        current_adc = 0
+        current_adc = 1
         accum_phase = 0
 
         mag = torch.tensor(
@@ -197,20 +232,18 @@ class BMCSim(BMCTool):
                     block = self.seq.get_block(block_event)
                     current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
                 
-        except AttributeError:
-            for block_event in loop_block_events:
-                block = self.seq.get_block(block_event)
-                current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
+            self.m_out = self.m_out[:, :, :self.t.numel()]
+            print(self.events)
 
-        # Trim die Zeiteinträge und passe die Form von m_out an
-        self.m_out = self.m_out[:, :, :self.t.numel()]
-        print(self.events)
-
-        if self.webhook:
-            end_time = time.time()
-            elapsed_time = timedelta(seconds=end_time - start_time)
-            notifier.send_completion_embed(elapsed_time)
-    
+            if self.webhook:
+                end_time = time.time()
+                elapsed_time = timedelta(seconds=end_time - start_time)
+                notifier.send_completion_embed(elapsed_time)
+                
+        except Exception as e:
+            if self.webhook:
+                notifier.send_failed_embed(e)
+            raise
     
 
     def get_mag(self, return_cest_pool: bool = False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
