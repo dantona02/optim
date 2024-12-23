@@ -118,3 +118,27 @@ class DiscordNotifier:
         response = requests.patch(edit_url, json={"embeds": [embed]})
         if response.status_code != 200:
             print(f"Error updating embed: {response.text}")
+    
+    def send_failed_embed(self, error_message):
+        """
+        Sendet ein Abschluss-Embed nach Beendigung der Simulation.
+        """
+        embed = {
+            "title": "Simulation failed ❌",
+            "description": f"Error: {str(error_message)}",
+            "color": 0xff0000,
+            "fields": [
+                {"name": "Sequence", "value": f"_{self.seq_filename}_", "inline": False},
+                {"name": "N-CEST", "value": f"{self.n_cest_pools}", "inline": True},
+                {"name": "N-Iso", "value": f"{self.n_isochromats}", "inline": True}
+            ],
+            "footer": {
+                "text": f"BMCTool | Device: {self.device}",
+                "icon_url": "https://i.imgur.com/soRZIOf.png"
+            }
+        }
+
+        edit_url = f"{self.webhook_url}/messages/{self.message_id}"
+        response = requests.patch(edit_url, json={"embeds": [embed]})
+        if response.status_code != 200:
+            print(f"Error updating embed: {response.text}")

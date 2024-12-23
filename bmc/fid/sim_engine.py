@@ -49,10 +49,10 @@ class BMCSim(BMCTool):
         else:
             self.n_measure = self.n_offsets
 
-        self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
+        self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure + 1]) #expanding m_out to the number of max_pulse_samples
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
 
-        self.t = np.array([])
+        self.t = np.array([0])
         self.total_vec = None
         self.events = []
 
@@ -63,36 +63,39 @@ class BMCSim(BMCTool):
 
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
         #adc with time dt and max_pulse_sampels
+
+        self.m_out[:, :, 0] = np.squeeze(mag)
+
         if block.adc is not None:
             
-            start_time = self.t[-1] if self.t.size > 0 else 0
+            start_time = self.t[-1]
             self.events.append(f'adc at {start_time:.4f}s')
-            time_array = start_time + np.arange(self.params.options["max_pulse_samples"]) * self.dt_adc
+            time_array = start_time + np.arange(1, self.params.options["max_pulse_samples"] + 1) * self.dt_adc
+
+        
             self.t = np.append(self.t, time_array)
 
-            for step in range(self.params.options["max_pulse_samples"]):
+            for step in range(len(time_array)):
+                self.bm_solver.update_matrix(0, 0, 0) #no rf_amp, no rf_phase, no rf_freq
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
+                
                 self.m_out[:, :, current_adc] = np.squeeze(mag)
                 
                 accum_phase = 0
                 current_adc += 1
-
-                self.bm_solver.update_matrix(0, 0, 0) #no rf_amp, no rf_phase, no rf_freq
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
             
             # RF pulse
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
             if self.write_all_mag:
-                start_time = self.t[-1] if self.t.size > 0 else 0
+                start_time = self.t[-1]
                 self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + np.arange(amp_.size) * dtp_
+                time_array = start_time + np.arange(1, amp_.size + 1) * dtp_
                 self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
-                if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
-                    self.m_out[:, :, current_adc] = np.squeeze(mag)
-                    current_adc += 1
+                
 
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
@@ -101,17 +104,21 @@ class BMCSim(BMCTool):
                 )
 
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+
+                if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
+                    current_adc += 1
                 
 
             if delay_after_pulse > 0: #might cause problems if delay_after_pulse is significantly larger than 0
                 self.bm_solver.update_matrix(0, 0, 0)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
                 if self.write_all_mag:
-                    start_time = self.t[-1] if self.t.size > 0 else 0
-                    time_array = start_time + np.arange(1) * delay_after_pulse  # Ein Zeitschritt hinzufügen
+                    start_time = self.t[-1]
+                    time_array = start_time + np.arange(1, 2) * delay_after_pulse  # Ein Zeitschritt hinzufügen
                     self.t = np.append(self.t, time_array)
                     self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
             phase_degree = dtp_ * amp_.size * 360 * block.rf.freq_offset
             phase_degree %= 360
@@ -121,29 +128,30 @@ class BMCSim(BMCTool):
             amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
 
             if self.write_all_mag:
-                start_time = self.t[-1] if self.t.size > 0 else 0
+                start_time = self.t[-1]
                 self.events.append(f'gz at {start_time:.4f}s')
-                time_array = start_time + np.arange(amp_.size) * dtp_
+                time_array = start_time + np.arange(1, amp_.size + 1) * dtp_
                 self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
-                
-                if self.write_all_mag:
-                    self.m_out[:, :, current_adc] = np.squeeze(mag)
-                    current_adc += 1
 
                 self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+
+                if self.write_all_mag:
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
+                    current_adc += 1
                 
             if delay_after_grad > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
+                
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
                 if self.write_all_mag:
-                    start_time = self.t[-1] if self.t.size > 0 else 0
-                    time_array = start_time + np.arange(1) * delay_after_grad  # Ein Zeitschritt hinzufügen
+                    start_time = self.t[-1]
+                    time_array = start_time + np.arange(1, 2) * delay_after_grad  # Ein Zeitschritt hinzufügen
                     self.t = np.append(self.t, time_array)
                     self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
-                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
 
         # elif block.gz is not None:
         #     dur_ = block.block_duration
@@ -151,6 +159,32 @@ class BMCSim(BMCTool):
         #     mag = self.bm_solver.solve_equation(mag=mag, dtp=dur_)
         #     for j in range((len(self.params.cest_pools) + 1) * 2):
         #         mag[0, j, 0] = 0.0  # assume complete spoiling
+        
+        elif hasattr(block, "block_duration") and block.block_duration != "0":
+            delay = block.block_duration
+            sample_factor_delay = int(self.params.options["max_pulse_samples"] / 10)
+            dt_delay = delay / sample_factor_delay
+            
+            if self.write_all_mag:
+                start_time = self.t[-1]
+                self.events.append(f'delay at {start_time:.4f}s')
+                time_array = start_time + np.arange(1, sample_factor_delay + 1) * dt_delay
+                 # Überspringe das erste Element, falls doppelt
+            
+                self.t = np.append(self.t, time_array)
+
+                for step in range(len(time_array)):
+                    
+                    self.bm_solver.update_matrix(0, 0, 0)
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dt_delay)
+                    self.m_out[:, :, current_adc] = np.squeeze(mag)
+                    current_adc += 1
+            else:
+                self.bm_solver.update_matrix(0, 0, 0)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay)
+            
+        else:
+            raise Exception("Unknown case")
 
         return current_adc, accum_phase, mag
 
@@ -161,7 +195,7 @@ class BMCSim(BMCTool):
         if self.n_offsets != self.n_measure:
             self.run_m0_scan = True
 
-        current_adc = 0
+        current_adc = 1
         accum_phase = 0
         mag = self.m_init[np.newaxis, np.newaxis, :, np.newaxis] #extended to [n_isochromats, ...]
 
@@ -199,18 +233,23 @@ class BMCSim(BMCTool):
                     block = self.seq.get_block(block_event)
                     current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
                 
-        except AttributeError:
-            for block_event in loop_block_events:
-                block = self.seq.get_block(block_event)
-                current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
+            self.m_out = self.m_out[:, :, :self.t.size]
+            print(self.events)
 
-        self.m_out = self.m_out[:, :, :self.t.size]
-        print(self.events)
+            unique_elements, counts = np.unique(self.t, return_counts=True)
+            duplicates = unique_elements[counts > 1]
+            print(duplicates)
 
-        if self.webhook:
-            end_time = time.time()
-            elapsed_time = timedelta(seconds=end_time - start_time)
-            notifier.send_completion_embed(elapsed_time)
+            if self.webhook:
+                end_time = time.time()
+                elapsed_time = timedelta(seconds=end_time - start_time)
+                notifier.send_completion_embed(elapsed_time)
+        
+        except Exception as e:
+            if self.webhook:
+                notifier.send_failed_embed(e)
+            raise
+            
     
 
     def get_mag(self, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
