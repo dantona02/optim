@@ -106,7 +106,7 @@ class DiscordNotifier:
                 {"name": "N-Iso", "value": f"{self.n_isochromats}", "inline": True},
                 {"name": "Simulation", "value": self._generate_bar(100), "inline": False},
                 {"name": "Duration", "value": f"`{str(elapsed_time)}`", "inline": True},
-                {"name": "Status", "value": "Completed", "inline": True}
+                {"name": "Total events", "value": f"{self.total_steps}", "inline": True}
             ],
             "footer": {
                 "text": f"BMCTool | Device: {self.device}",
