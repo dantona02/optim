@@ -18,7 +18,7 @@ from bmc.utils.webhook import DiscordNotifier
 
 
 class BMCSim(BMCTool):
-    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, z_positions: np.ndarray, verbose: bool = True, write_all_mag: bool = False, **kwargs) -> None:
+    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, z_positions: np.ndarray, verbose: bool = True, write_all_mag: bool = False, webhook: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         """
         Parameters
@@ -55,6 +55,8 @@ class BMCSim(BMCTool):
         self.t = np.array([])
         self.total_vec = None
         self.events = []
+
+        self.webhook = webhook
 
         
 
@@ -173,24 +175,29 @@ class BMCSim(BMCTool):
         else:
             loop_block_events = range(1, len(block_events) + 1)
 
-        notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/1319826840747245639/jeioX8DeZmynOv2Fatz5nB3F4-MMx3dCnMoM9Uit9c0yOtOuEvmlMpiE_MCDEXxlbkMg",
-                                   total_steps=len(block_events),
-                                   seq_file=self.seq_file,
-                                   n_cest_pools=len(self.params.cest_pools),
-                                   n_isochromats=self.n_isochromats,
-                                   device="cpu"
-                                   )
-        notifier.send_initial_embed()
+        if self.webhook:
+            notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/1319826840747245639/jeioX8DeZmynOv2Fatz5nB3F4-MMx3dCnMoM9Uit9c0yOtOuEvmlMpiE_MCDEXxlbkMg",
+                                    total_steps=len(block_events),
+                                    seq_file=self.seq_file,
+                                    n_cest_pools=len(self.params.cest_pools),
+                                    n_isochromats=self.n_isochromats,
+                                    device="cpu"
+                                    )
+            notifier.send_initial_embed()
   
         # code for pypulseq >= 1.4.0:
         
         try:
-            start_time = time.time()
-            for i, block_event in enumerate(loop_block_events, start=1):
-                block = self.seq.get_block(block_event)
-                current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
-
-                notifier.update_progress(i)
+            if self.webhook:
+                start_time = time.time()
+                for i, block_event in enumerate(loop_block_events, start=1):
+                    block = self.seq.get_block(block_event)
+                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+                    notifier.update_progress(i)
+            else:
+                for block_event in loop_block_events:
+                    block = self.seq.get_block(block_event)
+                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
                 
         except AttributeError:
             for block_event in loop_block_events:
@@ -200,9 +207,10 @@ class BMCSim(BMCTool):
         self.m_out = self.m_out[:, :, :self.t.size]
         print(self.events)
 
-        end_time = time.time()
-        elapsed_time = timedelta(seconds=end_time - start_time)
-        notifier.send_completion_embed(elapsed_time)
+        if self.webhook:
+            end_time = time.time()
+            elapsed_time = timedelta(seconds=end_time - start_time)
+            notifier.send_completion_embed(elapsed_time)
     
 
     def get_mag(self, return_cest_pool: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
