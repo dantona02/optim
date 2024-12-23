@@ -2,7 +2,9 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 import torch
+import time
 from bmc.utils.global_device import GLOBAL_DEVICE
+from datetime import timedelta
 
 from typing import Tuple, Union
 from bmc.bmc_solver import BlochMcConnellSolver
@@ -13,9 +15,10 @@ from IPython import get_ipython
 from manim import *
 from manim.opengl import *
 
+from bmc.utils.webhook import DiscordNotifier
 
 class BMCSim(BMCTool):
-    def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, verbose: bool = True, write_all_mag: bool = False, **kwargs) -> None:
+    def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, verbose: bool = True, write_all_mag: bool = False, webhook: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         self.z_positions = z_positions.to(GLOBAL_DEVICE)  # Torch-Tensor
         self.n_isochromats = len(self.z_positions)
@@ -37,6 +40,8 @@ class BMCSim(BMCTool):
         self.t = torch.tensor([], dtype=torch.float32, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
+
+        self.webhook = webhook
 
 
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, torch.Tensor]:
@@ -170,10 +175,28 @@ class BMCSim(BMCTool):
         else:
             loop_block_events = range(1, len(block_events) + 1)
 
+        if self.webhook:
+            notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/1319826840747245639/jeioX8DeZmynOv2Fatz5nB3F4-MMx3dCnMoM9Uit9c0yOtOuEvmlMpiE_MCDEXxlbkMg",
+                                    total_steps=len(block_events),
+                                    seq_file=self.seq_file,
+                                    n_cest_pools=len(self.params.cest_pools),
+                                    n_isochromats=self.n_isochromats,
+                                    device=f"{GLOBAL_DEVICE.type} - {torch.cuda.get_device_name(GLOBAL_DEVICE.index)}"
+                                    )
+            notifier.send_initial_embed()
+
         try:
-            for block_event in loop_block_events:
-                block = self.seq.get_block(block_event)
-                current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+            if self.webhook:
+                start_time = time.time()
+                for i, block_event in enumerate(loop_block_events, start=1):
+                    block = self.seq.get_block(block_event)
+                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+                    notifier.update_progress(i)
+            else:
+                for block_event in loop_block_events:
+                    block = self.seq.get_block(block_event)
+                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+                
         except AttributeError:
             for block_event in loop_block_events:
                 block = self.seq.get_block(block_event)
@@ -182,6 +205,12 @@ class BMCSim(BMCTool):
         # Trim die Zeiteinträge und passe die Form von m_out an
         self.m_out = self.m_out[:, :, :self.t.numel()]
         print(self.events)
+
+        if self.webhook:
+            end_time = time.time()
+            elapsed_time = timedelta(seconds=end_time - start_time)
+            notifier.send_completion_embed(elapsed_time)
+    
     
 
     def get_mag(self, return_cest_pool: bool = False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
