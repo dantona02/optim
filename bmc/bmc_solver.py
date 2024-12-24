@@ -6,6 +6,7 @@ import numpy as np
 from bmc.params import Params
 import torch
 from bmc.utils.global_device import GLOBAL_DEVICE
+from torch.cuda.amp import autocast
 
 
 class BlochMcConnellSolver:
@@ -209,6 +210,7 @@ class BlochMcConnellSolver:
                 - rf_amp_2pi**2 * self.get_mt_shape_at_offset(rf_freq_2pi + self.dw0, self.w0)
             )
 
+    @autocast()
     def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
         """
         Solves one step of BMC equations for multiple Isochromaten using the Padé approximation.
@@ -262,7 +264,7 @@ class BlochMcConnellSolver:
 
         # Compute the final magnetization
         mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
-        return mag
+        return mag.to(dtype=torch.float32)
 
 
     def solve_equation_expm(self, mag: np.ndarray, dtp: float) -> np.ndarray:
