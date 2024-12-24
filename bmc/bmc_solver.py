@@ -145,10 +145,11 @@ class BlochMcConnellSolver:
         j = self.first_dim  # size of first dimension (=1 for sequential, n_offsets for parallel)
         n_p = self.n_pools
         grad_term = 2 * np.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
+       
 
         # set dw0 due to b0_inhomogeneity
-        self.arr_a[:, :, 0, 1 + n_p] = [self.dw0] * j + self.inhomogeneity_hz[:, np.newaxis]
-        self.arr_a[:, :, 1 + n_p, 0] = [-1 * self.dw0] * j - self.inhomogeneity_hz[:, np.newaxis]
+        self.arr_a[:, :, 0, 1 + n_p] = self.dw0[:, np.newaxis] * j
+        self.arr_a[:, :, 1 + n_p, 0] = -1 * self.dw0[:, np.newaxis] * j
 
         #set dw_grad for water pool
         self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j??
@@ -184,8 +185,8 @@ class BlochMcConnellSolver:
         # set off-resonance terms for cest pools
         for i in range(1, n_p + 1):
             dwi = self.params.cest_pools[i - 1]["dw"] * self.w0 - (rf_freq_2pi + self.dw0)
-            self.arr_a[:, :, i, i + n_p + 1] = -dwi
-            self.arr_a[:, :, i + n_p + 1, i] = dwi
+            self.arr_a[:, :, i, i + n_p + 1] = -dwi[:, np.newaxis]
+            self.arr_a[:, :, i + n_p + 1, i] = dwi[:, np.newaxis]
 
             self.arr_a[:, :, i, i + n_p + 1] -= grad_term
             self.arr_a[:, :, i + n_p + 1, i] += grad_term
