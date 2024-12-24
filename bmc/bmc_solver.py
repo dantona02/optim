@@ -39,15 +39,7 @@ class BlochMcConnellSolver:
         self.arr_c: np.ndarray = None
         self.w0: float = None
         self.dw0: float = None
-
-        self.larmor_freq = self.params.scanner["gamma"] * self.params.scanner["b0"]  # gamma in MHz/T, B0 in T
-
-        # Normalverteilte Inhomogenitäten in Hz berechnen
-        mean_ppm = 0  # Mittelwert in ppm
-        std_ppm = 0.02  # Standardabweichung in ppm
-        np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
-        inhomogeneity_ppm = np.random.normal(mean_ppm, std_ppm, self.n_isochromats)
-        self.inhomogeneity_hz = inhomogeneity_ppm * self.larmor_freq
+        self.mean_ppm: float = 0
 
         self.update_params(params)
 
@@ -137,7 +129,8 @@ class BlochMcConnellSolver:
         """
         self.params = params
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
-        self.dw0 = self.w0 * params.scanner["b0_inhomogeneity"]
+        np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
+        self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
         self._init_matrix_a()
         self._init_vector_c()
 
