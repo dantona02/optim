@@ -38,8 +38,14 @@ class BlochMcConnellSolver:
         self.arr_a: torch.Tensor = None
         self.arr_c: torch.Tensor = None
         self.w0: float = None
-        self.dw0: float = None
+        self.dw0: torch.Tensor = None
         self.mean_ppm: float = 0
+
+        self.dw_tensors = torch.tensor(
+            [pool["dw"] for pool in params.cest_pools],
+            dtype=torch.float32,
+            device=GLOBAL_DEVICE
+        )
 
         self.update_params(params)
 
@@ -155,8 +161,8 @@ class BlochMcConnellSolver:
         grad_term = 2 * torch.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
 
         # Set dw0 due to b0 inhomogeneity
-        self.arr_a[:, :, 0, 1 + n_p] = self.dw0
-        self.arr_a[:, :, 1 + n_p, 0] = -self.dw0
+        self.arr_a[:, :, 0, 1 + n_p] = self.dw0.unsqueeze(1)
+        self.arr_a[:, :, 1 + n_p, 0] = -self.dw0.unsqueeze(1)
 
         # Set gradient terms for water pool
         self.arr_a[:, :, 0, 1 + n_p] += grad_term
@@ -187,9 +193,9 @@ class BlochMcConnellSolver:
 
         # Set off-resonance terms for CEST pools
         for i in range(1, n_p + 1):
-            dwi = self.params.cest_pools[i - 1]["dw"] * self.w0 - (rf_freq_2pi + self.dw0)
-            self.arr_a[:, :, i, i + n_p + 1] = -dwi
-            self.arr_a[:, :, i + n_p + 1, i] = dwi
+            dwi = self.dw_tensors[i - 1] * self.w0 - (rf_freq_2pi + self.dw0)
+            self.arr_a[:, :, i, i + n_p + 1] = -dwi.unsqueeze(1)
+            self.arr_a[:, :, i + n_p + 1, i] = dwi.unsqueeze(1)
 
             # Add gradient terms for CEST pools
             self.arr_a[:, :, i, i + n_p + 1] -= grad_term
