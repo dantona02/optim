@@ -35,8 +35,9 @@ class BMCSim(BMCTool):
         self.n_measure = int(self.defs["num_meas"]) if "num_meas" in self.defs else self.n_offsets
 
         self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float32, device=GLOBAL_DEVICE)
-        self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
+        self.m_out[:, :, 0] = torch.tensor(self.m_init, dtype=torch.float32, device=GLOBAL_DEVICE).unsqueeze(0)
 
+        self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
         self.t = torch.tensor([0], dtype=torch.float32, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
@@ -69,8 +70,6 @@ class BMCSim(BMCTool):
         mag : torch.Tensor
             Updated magnetization vector.
         """
-
-        self.m_out[:, :, 0] = mag.squeeze()
 
         # ADC
         if block.adc is not None:

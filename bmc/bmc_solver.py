@@ -39,6 +39,7 @@ class BlochMcConnellSolver:
         self.arr_c: torch.Tensor = None
         self.w0: float = None
         self.dw0: float = None
+        self.mean_ppm: float = 0
 
         self.update_params(params)
 
@@ -129,7 +130,8 @@ class BlochMcConnellSolver:
         """
         self.params = params
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
-        self.dw0 = self.w0 * params.scanner["b0_inhomogeneity"]
+        torch.manual_seed(42)
+        self.dw0 = self.w0 * torch.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], size=(self.n_isochromats,), dtype=torch.float32, device=GLOBAL_DEVICE)
         self._init_matrix_a()
         self._init_vector_c()
 
