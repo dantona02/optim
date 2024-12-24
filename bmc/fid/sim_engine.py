@@ -50,37 +50,29 @@ class BMCSim(BMCTool):
             self.n_measure = self.n_offsets
 
         self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure + 1]) #expanding m_out to the number of max_pulse_samples
-        self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
+        self.m_out[:, :, 0] = self.m_init[np.newaxis, :]
 
+        self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
         self.t = np.array([0])
         self.total_vec = None
         self.events = []
 
         self.webhook = webhook
 
-        
-
-
     def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
         #adc with time dt and max_pulse_sampels
-
-        self.m_out[:, :, 0] = np.squeeze(mag)
 
         if block.adc is not None:
             
             start_time = self.t[-1]
             self.events.append(f'adc at {start_time:.4f}s')
             time_array = start_time + np.arange(1, self.params.options["max_pulse_samples"] + 1) * self.dt_adc
-
-        
             self.t = np.append(self.t, time_array)
 
             for step in range(len(time_array)):
                 self.bm_solver.update_matrix(0, 0, 0) #no rf_amp, no rf_phase, no rf_freq
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
-                
                 self.m_out[:, :, current_adc] = np.squeeze(mag)
-                
                 accum_phase = 0
                 current_adc += 1
             
@@ -359,6 +351,7 @@ class BMCSim(BMCTool):
                  self.m_out[:, 1, :],
                  self.m_out[:, self.params.mz_loc, :]),
                  axis=2)
+        
         m_vec_total = np.stack(
             (self.total_vec[:, 0],
             self.total_vec[:, 1],
@@ -369,7 +362,8 @@ class BMCSim(BMCTool):
         
         
         m_vec_water = m_vec_water[:, ::step]
-        m_vec_total = m_vec_total[::step]  # Schrittweite anwenden
+        if m_vec_total is not None:
+            m_vec_total = m_vec_total[::step]
         middle_idx = np.where(self.z_positions == 0)[0][0]
         m_vec_middle = m_vec_water[middle_idx] if total_mag else None
         render_params = {

@@ -40,6 +40,15 @@ class BlochMcConnellSolver:
         self.w0: float = None
         self.dw0: float = None
 
+        self.larmor_freq = self.params.scanner["gamma"] * self.params.scanner["b0"]  # gamma in MHz/T, B0 in T
+
+        # Normalverteilte Inhomogenitäten in Hz berechnen
+        mean_ppm = 0  # Mittelwert in ppm
+        std_ppm = 0.02  # Standardabweichung in ppm
+        np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
+        inhomogeneity_ppm = np.random.normal(mean_ppm, std_ppm, self.n_isochromats)
+        self.inhomogeneity_hz = inhomogeneity_ppm * self.larmor_freq
+
         self.update_params(params)
 
     def _init_matrix_a(self) -> None:
@@ -98,7 +107,6 @@ class BlochMcConnellSolver:
 
         # if parallel computation is activated, repeat matrix A n_offsets times along a new axis
         if self.par_calc:
-            # self.arr_a = np.repeat(self.arr_a, self.n_isochromats, axis=0)
             self.arr_a = np.repeat(self.arr_a, self.n_offsets, axis=1)
             self.first_dim = self.n_offsets
 
@@ -146,8 +154,8 @@ class BlochMcConnellSolver:
         grad_term = 2 * np.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
 
         # set dw0 due to b0_inhomogeneity
-        self.arr_a[:, :, 0, 1 + n_p] = [self.dw0] * j
-        self.arr_a[:, :, 1 + n_p, 0] = [-1 * self.dw0] * j
+        self.arr_a[:, :, 0, 1 + n_p] = [self.dw0] * j + self.inhomogeneity_hz[:, np.newaxis]
+        self.arr_a[:, :, 1 + n_p, 0] = [-1 * self.dw0] * j - self.inhomogeneity_hz[:, np.newaxis]
 
         #set dw_grad for water pool
         self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j??
