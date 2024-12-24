@@ -96,6 +96,9 @@ def simulate(config_file: Union[str, Path],
     FileNotFoundError
         If the config_file or seq_file is not found.
     """
+    seq_file = Path(seq_file).resolve()
+    config_file = Path(config_file).resolve()
+
     if not Path(config_file).exists():
         raise FileNotFoundError(f"File {config_file} not found.")
 
