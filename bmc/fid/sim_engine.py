@@ -210,7 +210,7 @@ class BMCSim(BMCTool):
             loop_block_events = range(1, len(block_events) + 1)
 
         if self.webhook:
-            notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/1319826840747245639/jeioX8DeZmynOv2Fatz5nB3F4-MMx3dCnMoM9Uit9c0yOtOuEvmlMpiE_MCDEXxlbkMg",
+            notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/1321535040164728932/LcXvJRZFlns6w18hN4mDkCWuQawYTcWao1GLUOnDYK9QpVUw3lxLLUNl0zIsXdcVBNWK",
                                     total_steps=len(block_events),
                                     seq_file=self.seq_file,
                                     n_cest_pools=len(self.params.cest_pools),
