@@ -14,17 +14,23 @@
 # dw: chemical shift (delta omega) relative to water [ppm] (MT and CEST pools only) (float)
 
 ### water pool
+# water_pool: {
+#   f: 1.0,
+#   t1: 2.9,
+#   t2: 500e-3
+# }
 water_pool: {
-  f: 1.0,
-  t1: 2.9,
-  t2: 500e-3
+  f: 1,
+  t1: 3,
+  t2: 1
 }
 
 cest_pool: {  
   'amide': {
-    f: 0.00064865, # 72e-3 / 111,
+    # f: 0.00064865, # 72e-3 / 111,
+    f: 0.01,
     t1: 1.3,
-    t2: 0.1,
+    t2: 1,
     k: 150,
     dw: 3.5
   # },
@@ -56,7 +62,7 @@ cest_pool: {
 
 b0: 17
 gamma: 267.5153
-b0_inhom: 0.05
+b0_inhom: 0.0
 rel_b1: 1
 
 ##### Additional simulation settings

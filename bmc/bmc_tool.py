@@ -119,12 +119,17 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
         amp_ = amp[0]
         dtp_ = dtp * amp.size
     # shaped pulse
-    elif n_unique > max_pulse_samples:
-        sample_factor = int(np.ceil(amp.size / max_pulse_samples))
-        amp_ = amp[::sample_factor]
-        dtp_ = dtp * sample_factor
+    elif 1 < n_unique < max_pulse_samples:
+        # Interpolate to exactly `max_pulse_samples`
+        x_original = np.linspace(0, amp.size - 1, amp.size)
+        x_resampled = np.linspace(0, amp.size - 1, max_pulse_samples)
+        x_original = np.ravel(x_original)
+        x_resampled = np.ravel(x_resampled)
+        amp = np.ravel(amp)
+        amp_ = np.interp(x_resampled, x_original, amp)
+        dtp_ = dtp * (amp.size / max_pulse_samples)
     else:
-        raise Exception("Case with 1 < unique samples < max_pulse_samples not implemented yet. Sorry :(")
+        raise Exception("Unexpected case encountered in prep_grad_simulation.")
 
     return amp_, dtp_, delay_after_grad
 
