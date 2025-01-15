@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 15-Jan-2025 13:58:25
+# Created at: 15-Jan-2025 14:36:35
 
 [VERSION]
 major 1
@@ -19,7 +19,7 @@ FREQ 723.7988
 GradientRasterTime 1e-05 
 M0_offset 3.5 
 RadiofrequencyRasterTime 1e-06 
-TotalDuration 0.0274 
+TotalDuration 0.1162 
 a 90 
 num_meas 1 
 offsets_ppm 3.5 
@@ -36,9 +36,41 @@ seq_id_string 1_ETM
  6 250   0   0   0   0  0  0
  7 500   0   0   0   2  0  0
  8 250   0   0   0   0  0  0
- 9 400   2   0   0   0  0  0
-10  20   0   0   0   1  0  0
-11 100   0   0   0   0  1  0
+ 9 400   1   0   0   0  0  0
+10 200   0   0   0   0  0  0
+11  20   0   0   0   1  0  0
+12 200   0   0   0   0  0  0
+13 400   1   0   0   0  0  0
+14 250   0   0   0   0  0  0
+15 500   0   0   0   2  0  0
+16 250   0   0   0   0  0  0
+17 400   1   0   0   0  0  0
+18 200   0   0   0   0  0  0
+19  20   0   0   0   1  0  0
+20 200   0   0   0   0  0  0
+21 400   1   0   0   0  0  0
+22 250   0   0   0   0  0  0
+23 500   0   0   0   2  0  0
+24 250   0   0   0   0  0  0
+25 400   1   0   0   0  0  0
+26 200   0   0   0   0  0  0
+27  20   0   0   0   1  0  0
+28 200   0   0   0   0  0  0
+29 400   1   0   0   0  0  0
+30 250   0   0   0   0  0  0
+31 500   0   0   0   2  0  0
+32 250   0   0   0   0  0  0
+33 400   1   0   0   0  0  0
+34 200   0   0   0   0  0  0
+35  20   0   0   0   1  0  0
+36 200   0   0   0   0  0  0
+37 400   1   0   0   0  0  0
+38 250   0   0   0   0  0  0
+39 500   0   0   0   2  0  0
+40 250   0   0   0   0  0  0
+41 400   2   0   0   0  0  0
+42  20   0   0   0   1  0  0
+43 100   0   0   0   0  1  0
 
 # Format of RF events:
 # id amplitude mag_id phase_id time_shape_id delay freq phase
@@ -4211,4 +4243,4 @@ num_samples 5000
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 4663e7ffe6b49970214bbd377d6855cd
+Hash dc937c44f262a51bd0979f0340b3d9cf
