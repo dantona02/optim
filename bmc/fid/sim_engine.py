@@ -166,7 +166,7 @@ class BMCSim(BMCTool):
             if self.write_all_mag:
                 start_time = self.t[-1].item()
                 self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                time_array = start_time + torch.arange(1, sample_factor_delay + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dt_delay
                 self.t = torch.cat((self.t, time_array))
 
                 for step in range(len(time_array)):

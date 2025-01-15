@@ -14,6 +14,7 @@ from tqdm import tqdm
 from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.params import Params
 import torch
+import torch.nn.functional as F
 
 from bmc.utils.global_device import GLOBAL_DEVICE
 
@@ -127,8 +128,23 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
         sample_factor = int(torch.ceil(torch.tensor(amp.size(0) / max_pulse_samples, device=GLOBAL_DEVICE)))
         amp_ = amp[::sample_factor]
         dtp_ = dtp * sample_factor
+    if 1 < n_unique < max_pulse_samples:
+        # Reshape amp to make it compatible with F.interpolate
+        amp = amp.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, amp.size(0))
+
+        # Interpolate to exactly `max_pulse_samples`
+        amp_ = F.interpolate(amp, size=max_pulse_samples, mode='linear', align_corners=True)
+
+        # Flatten the result back to 1D
+        amp_ = amp_.squeeze(0).squeeze(0)  # Shape: (max_pulse_samples,)
+
+        # Adjust dtp
+        dtp_ = dtp * (amp.size(2) / max_pulse_samples)  # amp.size(2) corresponds to the original length
+
+        amp_ = amp_.to(GLOBAL_DEVICE)
+        
     else:
-        raise Exception("Case with 1 < unique samples < max_pulse_samples not implemented yet. Sorry :(")
+        raise Exception("Unexpected case encountered in prep_grad_simulation.")
 
     return amp_, dtp_, delay_after_grad
 
