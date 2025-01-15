@@ -3,8 +3,21 @@ params.py
     Definition of the Params class, which stores all simulation parameters.
 """
 import numpy as np
+# from numba import float64, int32, boolean, types
+# from numba.experimental import jitclass
 
-
+# spec = [
+#     ('water_pool', types.DictType(types.unicode_type, float64)),
+#     ('cest_pools', types.ListType(types.DictType(types.unicode_type, float64))),
+#     ('mt_pool', types.DictType(types.unicode_type, float64)),
+#     ('scanner', types.DictType(types.unicode_type, float64)),
+#     ('options', types.DictType(types.unicode_type, types.Any)),
+#     ('mz_loc', int32),
+#     ('m_vec', float64[:]),
+#     ('offsets', float64[:]),
+#     ('m0_scan', float64[:]),
+# ]
+# @jitclass(spec)
 class Params:
     """
     Class to store simulation parameters

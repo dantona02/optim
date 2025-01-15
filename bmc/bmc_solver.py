@@ -243,8 +243,8 @@ class BlochMcConnellSolver:
         # Compute the final magnetization
         mag = np.matmul(f, mag + a_inv_t) - a_inv_t
         return mag
-
-
+    
+    
     # def solve_equation_expm(self, mag: np.ndarray, dtp: float) -> np.ndarray:
     #     """
     #     Solves one step of BMC equations using the eigenwert ansatz.
