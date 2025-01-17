@@ -98,6 +98,8 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
     amp = np.abs(block.gz.waveform)
     idx = np.argwhere(amp > 1e-6)
 
+    amp = block.gz.waveform
+
     try:
         grad_length = amp.size
         dtp = block.gz.tt[1] - block.gz.tt[0]
@@ -130,6 +132,8 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
         dtp_ = dtp * (amp.size / max_pulse_samples)
     else:
         raise Exception("Unexpected case encountered in prep_grad_simulation.")
+
+    # print(amp_)
 
     return amp_, dtp_, delay_after_grad
 

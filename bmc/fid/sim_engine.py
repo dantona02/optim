@@ -269,7 +269,7 @@ class BMCSim(BMCTool):
             m_y_total = np.sum(m_y, axis=0)
             m_z_total = np.sum(m_z, axis=0)
 
-            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2)) #/ self.params.cest_pools[0]["f"]
 
             m_z_total /= norm_factor if norm_factor != 0 else 1
             
@@ -316,7 +316,7 @@ class BMCSim(BMCTool):
         return self.t
     
 
-    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, **addParams) -> None:
+    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, **addParams) -> None:
         """
         Animates the magnetization vector for all isochromats in a 3D plot.
         ----------
@@ -338,19 +338,27 @@ class BMCSim(BMCTool):
         isochromats = self.n_isochromats
 
         # Magnetisierung für Wasserpools vorbereiten
-        if self.params.cest_pools:
+        if animate_cest:
             n_total_pools = len(self.params.cest_pools) + 1
             m_vec_water = np.stack(
-                (self.m_out[:, 0, :],
-                 self.m_out[:, n_total_pools, :],
-                 self.m_out[:, self.params.mz_loc, :]),
+                (self.m_out[:, n_total_pools + 1, :],
+                 self.m_out[:, 1, :],
+                 self.m_out[:, self.params.mz_loc + 1, :]),
                  axis=2)
         else:
-            m_vec_water = np.stack(
-                (self.m_out[:, 0, :],
-                 self.m_out[:, 1, :],
-                 self.m_out[:, self.params.mz_loc, :]),
-                 axis=2)
+            if self.params.cest_pools is not None:
+                n_total_pools = len(self.params.cest_pools) + 1
+                m_vec_water = np.stack(
+                    (self.m_out[:, 0, :],
+                    self.m_out[:, n_total_pools, :],
+                    self.m_out[:, self.params.mz_loc, :]),
+                    axis=2)
+            else:
+                m_vec_water = np.stack(
+                    (self.m_out[:, 0, :],
+                    self.m_out[:, 1, :],
+                    self.m_out[:, self.params.mz_loc, :]),
+                    axis=2)
         
         m_vec_total = np.stack(
             (self.total_vec[:, 0],
