@@ -292,7 +292,7 @@ class BMCSim(BMCTool):
             m_y_total = torch.sum(m_y, dim=0)
             m_z_total = torch.sum(m_z, dim=0)
 
-            norm_factor = torch.max(torch.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+            norm_factor = self.n_isochromats #torch.max(torch.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
 
             m_z_total /= norm_factor if norm_factor != 0 else 1
             m_x_total /= norm_factor if norm_factor != 0 else 1

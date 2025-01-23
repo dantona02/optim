@@ -103,6 +103,8 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
     amp = torch.tensor(block.gz.waveform, dtype=torch.float32, device=GLOBAL_DEVICE).abs()
     idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
 
+    amp = torch.tensor(block.gz.waveform, dtype=torch.float32, device=GLOBAL_DEVICE)
+
     try:
         grad_length = amp.size(0)
         dtp = float(block.gz.tt[1] - block.gz.tt[0])
