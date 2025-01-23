@@ -293,7 +293,8 @@ class BMCSim(BMCTool):
             m_y_total = np.sum(m_y, axis=0)
             m_z_total = np.sum(m_z, axis=0)
 
-            norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+            # norm_factor = np.max(np.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
+            norm_factor = self.n_isochromats
 
             m_z_total /= norm_factor if norm_factor != 0 else 1
             

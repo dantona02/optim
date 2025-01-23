@@ -133,8 +133,6 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
     else:
         raise Exception("Unexpected case encountered in prep_grad_simulation.")
 
-    # print(amp_)
-
     return amp_, dtp_, delay_after_grad
 
 
