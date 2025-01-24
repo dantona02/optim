@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 23-Jan-2025 23:41:44
+# Created at: 24-Jan-2025 16:04:19
 
 [VERSION]
 major 1
@@ -24,7 +24,7 @@ a 90
 n_ETM 10 
 num_meas 1 
 offsets_ppm -10 
-seq_id_string ['tex_2ms_minus', 'tex_8ms_minus', 'tex_16ms_minus', 'tex_25ms_minus', 'tex_35ms_minus', 'tex_45ms_minus', 'tex_80ms_minus', 'tex_160ms_minus', 'tex_200ms_minus', 'tex_300ms_minus'] 
+seq_id_string ['tex_2ms_minus', 'tex_4ms_minus', 'tex_8ms_minus', 'tex_12ms_minus', 'tex_16ms_minus', 'tex_20ms_minus', 'tex_25ms_minus', 'tex_30ms_minus', 'tex_35ms_minus', 'tex_40ms_minus', 'tex_45ms_minus', 'tex_60ms_minus', 'tex_80ms_minus', 'tex_120ms_minus', 'tex_160ms_minus', 'tex_200ms_minus', 'tex_300ms_minus', 'tex_400ms_minus', 'tex_500ms_minus'] 
 
 # Format of blocks:
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
@@ -2197,4 +2197,4 @@ num_samples 500
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 8a4f9e959777c9610454357c78df5c5b
+Hash 672b2dd34a1b4663e7ad6cdfcf7e3063
