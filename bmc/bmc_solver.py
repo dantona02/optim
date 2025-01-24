@@ -127,7 +127,7 @@ class BlochMcConnellSolver:
         Updates matrix self.A according to given Params object.
         """
         self.params = params
-        self.w0 = params.scanner["b0"] * params.scanner["gamma"] 
+        self.w0 = params.scanner["b0"] * params.scanner["gamma"]
         np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
         self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
         self._init_matrix_a()
