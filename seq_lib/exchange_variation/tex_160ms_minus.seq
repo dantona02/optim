@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 23-Jan-2025 19:56:52
+# Created at: 23-Jan-2025 23:41:44
 
 [VERSION]
 major 1
@@ -17,14 +17,14 @@ B0 17
 BlockDurationRaster 1e-05 
 FREQ 723.7988 
 GradientRasterTime 1e-05 
-M0_offset 8 
+M0_offset -10 
 RadiofrequencyRasterTime 1e-06 
-TotalDuration 0.071 
+TotalDuration 1.6585 
 a 90 
-n_ETM 5 
+n_ETM 10 
 num_meas 1 
-offsets_ppm 8 
-seq_id_string 1_ETM 
+offsets_ppm -10 
+seq_id_string ['tex_2ms_minus', 'tex_8ms_minus', 'tex_16ms_minus', 'tex_25ms_minus', 'tex_35ms_minus', 'tex_45ms_minus', 'tex_80ms_minus', 'tex_160ms_minus', 'tex_200ms_minus', 'tex_300ms_minus'] 
 
 # Format of blocks:
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
@@ -34,40 +34,70 @@ seq_id_string 1_ETM
  3  50   0   0   0   1  0  0
  4  50   0   0   0   0  0  0
  5 200   1   0   0   0  0  0
- 6 800   0   0   0   2  0  0
+ 6 16000   0   0   0   0  0  0
  7 200   1   0   0   0  0  0
  8  50   0   0   0   0  0  0
  9  50   0   0   0   1  0  0
 10  50   0   0   0   0  0  0
 11 200   1   0   0   0  0  0
-12 800   0   0   0   2  0  0
+12 16000   0   0   0   0  0  0
 13 200   1   0   0   0  0  0
 14  50   0   0   0   0  0  0
 15  50   0   0   0   1  0  0
 16  50   0   0   0   0  0  0
 17 200   1   0   0   0  0  0
-18 800   0   0   0   2  0  0
+18 16000   0   0   0   0  0  0
 19 200   1   0   0   0  0  0
 20  50   0   0   0   0  0  0
 21  50   0   0   0   1  0  0
 22  50   0   0   0   0  0  0
 23 200   1   0   0   0  0  0
-24 800   0   0   0   2  0  0
+24 16000   0   0   0   0  0  0
 25 200   1   0   0   0  0  0
 26  50   0   0   0   0  0  0
 27  50   0   0   0   1  0  0
 28  50   0   0   0   0  0  0
 29 200   1   0   0   0  0  0
-30 800   0   0   0   2  0  0
-31 200   2   0   0   0  0  0
-32  50   0   0   0   1  0  0
-33 100   0   0   0   0  1  0
+30 16000   0   0   0   0  0  0
+31 200   1   0   0   0  0  0
+32  50   0   0   0   0  0  0
+33  50   0   0   0   1  0  0
+34  50   0   0   0   0  0  0
+35 200   1   0   0   0  0  0
+36 16000   0   0   0   0  0  0
+37 200   1   0   0   0  0  0
+38  50   0   0   0   0  0  0
+39  50   0   0   0   1  0  0
+40  50   0   0   0   0  0  0
+41 200   1   0   0   0  0  0
+42 16000   0   0   0   0  0  0
+43 200   1   0   0   0  0  0
+44  50   0   0   0   0  0  0
+45  50   0   0   0   1  0  0
+46  50   0   0   0   0  0  0
+47 200   1   0   0   0  0  0
+48 16000   0   0   0   0  0  0
+49 200   1   0   0   0  0  0
+50  50   0   0   0   0  0  0
+51  50   0   0   0   1  0  0
+52  50   0   0   0   0  0  0
+53 200   1   0   0   0  0  0
+54 16000   0   0   0   0  0  0
+55 200   1   0   0   0  0  0
+56  50   0   0   0   0  0  0
+57  50   0   0   0   1  0  0
+58  50   0   0   0   0  0  0
+59 200   1   0   0   0  0  0
+60 16000   0   0   0   0  0  0
+61 200   2   0   0   0  0  0
+62  50   0   0   0   1  0  0
+63 100   0   0   0   0  1  0
 
 # Format of RF events:
 # id amplitude mag_id phase_id time_shape_id delay freq phase
 # ..        Hz   ....     ....          ....    us   Hz   rad
 [RF]
-1      499.999 1 2 0 0 5790.39 0
+1      499.999 1 2 0 0 -7237.99 0
 2      499.999 1 2 0 0 0 0
 
 # Format of arbitrary gradients:
@@ -76,7 +106,6 @@ seq_id_string 1_ETM
 # ..      Hz/m       ..         ..          us
 [GRADIENTS]
 1  5.56899e+07 3 4 0
-2  4.08733e+08 5 6 0
 
 # Format of ADC events:
 # id num dwell delay freq phase
@@ -2162,88 +2191,10 @@ num_samples 500
 0.1
 497
 
-shape_id 5
-num_samples 8000
-0
-0.02
-0.02
-48
-0
-0
-7898
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
-
-shape_id 6
-num_samples 8000
-0.05
-0.1
-0.1
-7997
-
 
 [SIGNATURE]
 # This is the hash of the Pulseq file, calculated right before the [SIGNATURE] section was added
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash e5f3c1506724b878d12f54c7db964e00
+Hash 34fafc2e76b1178a8f84b5c4c29dc7ec
