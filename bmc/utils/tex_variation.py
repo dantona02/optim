@@ -1,73 +1,144 @@
 import re
+import psutil
 import numpy as np
 import multiprocessing
+import time
 from bmc.simulate import simulate
+import gc
 
 def _run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook):
     try:
-        signal = 0
         t_ex = 0
+
+        # t_ex aus dem Dateinamen extrahieren (Beispiel)
         match = re.search(r'\d+', seq_path_on)
         if match:
             t_ex = int(match.group())
 
-        simOn = simulate(config_file=config_path, 
-                         seq_file=seq_path_on, 
-                         adc_time=adc_time,
-                         z_positions=z_pos,
-                         return_zmag=False,
-                         iso_select=[0],
-                         show_plot=False,
-                         write_all_mag=True,
-                         webhook=webhook,
-                         plt_range=None)
+        # --- Simulation "On"
+        sim_on = simulate(
+            config_file=config_path,
+            seq_file=seq_path_on,
+            adc_time=adc_time,
+            z_positions=z_pos,
+            return_zmag=False,
+            iso_select=[0],
+            show_plot=False,
+            write_all_mag=True,
+            webhook=webhook,
+            plt_range=None
+        )
+        _, _, _, _, m_complex_on = sim_on.get_mag(return_cest_pool=False)
+        m_on = np.abs(m_complex_on[-600:])
+        
+        del m_complex_on, sim_on
+        gc.collect()
 
-        simOff = simulate(config_file=config_path, 
-                          seq_file=seq_path_off, 
-                          adc_time=adc_time,
-                          z_positions=z_pos,
-                          return_zmag=False,
-                          iso_select=[0],
-                          show_plot=False,
-                          write_all_mag=True,
-                          webhook=webhook,
-                          plt_range=None)
+        # --- Simulation "Off"
+        sim_off = simulate(
+            config_file=config_path,
+            seq_file=seq_path_off,
+            adc_time=adc_time,
+            z_positions=z_pos,
+            return_zmag=False,
+            iso_select=[0],
+            show_plot=False,
+            write_all_mag=True,
+            webhook=webhook,
+            plt_range=None
+        )
+        _, _, _, _, m_complex_off = sim_off.get_mag(return_cest_pool=False)
+        m_off = np.abs(m_complex_off[-600:])
 
-        _, _, _, _, m_complex_on = simOn.get_mag(return_cest_pool=False)
-        _, _, _, _, m_complex_off = simOff.get_mag(return_cest_pool=False)
+        del m_complex_off, sim_off
+        gc.collect()
 
-        assert len(m_complex_on) >= 600 and len(m_complex_off) >= 600, \
-            f"Arrays sind zu klein: m_complex_on={len(m_complex_on)}, m_complex_off={len(m_complex_off)}"
+        # Prüfen, ob beide Arrays korrekt sind
+        if len(m_on) != 600 or len(m_off) != 600:
+            raise ValueError(f"Arrays sind zu klein: m_on={len(m_on)}, m_off={len(m_off)}")
 
-        m_on = np.abs(m_complex_on)[-600:]
-        m_off = np.abs(m_complex_off)[-600:]
+        # Signal berechnen
         signal_corrected = m_on - m_off
         signal = np.max(signal_corrected)
+
+        del m_on, m_off, signal_corrected
+        gc.collect()
+
         return t_ex, signal
+
     except Exception as e:
         print(f"Fehler bei der Verarbeitung: {e}")
         return None, None
 
-def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, num_points=2, batch_size=10, max_processes=4):
-    assert len(seq_path_on) == len(seq_path_off), "Eingabelisten müssen die gleiche Länge haben"
-    
-    num_processes = min(multiprocessing.cpu_count(), max_processes)  # Begrenze Prozesse
+def run_variation_helper(args):
+    return _run_variation(*args)
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+def run_variation(
+    seq_path_on,
+    seq_path_off,
+    config_path,
+    adc_time,
+    z_pos,
+    webhook,
+    num_points=2,
+    batch_size=10,
+    max_processes=4,
+    save_path="results.npy"
+):
+    """
+    Verteilt die '_run_variation'-Aufrufe auf mehrere Prozesse.
+    Achtet darauf, vor jedem Batch die RAM-Auslastung zu prüfen.
+    Speichert Zwischenergebnisse nach jeder einzelnen Berechnung.
+    """
+    assert len(seq_path_on) == len(seq_path_off), "Listen müssen gleiche Länge haben"
+
+    num_processes = min(multiprocessing.cpu_count(), max_processes)
     results = []
 
-    # Batchweise Verarbeitung
+    try:
+        results = np.load(save_path, allow_pickle=True).tolist()
+        print(f"Geladene Ergebnisse: {len(results)}")
+    except FileNotFoundError:
+        print("Keine vorherigen Ergebnisse gefunden, starte neu.")
+
+    # Bereits verarbeitete t_ex sammeln
+    processed_indices = set(t_ex for t_ex, _ in results if t_ex is not None)
+    print(f"Bereits verarbeitete Indizes: {len(processed_indices)}")
+
     for batch_start in range(0, num_points, batch_size):
         batch_end = min(batch_start + batch_size, num_points)
+
         args_list = [
-            (seq_path_on[i], seq_path_off[i], config_path, adc_time, z_pos, webhook)
+            (
+                seq_path_on[i],
+                seq_path_off[i],
+                config_path,
+                adc_time,
+                z_pos,
+                webhook
+            )
             for i in range(batch_start, batch_end)
+            if i not in processed_indices
         ]
+        if not args_list:
+            continue
 
-        with multiprocessing.Pool(num_processes) as pool:
-            batch_results = pool.starmap(_run_variation, args_list)
-        results.extend(batch_results)
+        # Warte, bis RAM unter 90% ist
+        while psutil.virtual_memory().percent > 90:
+            print(f"RAM {psutil.virtual_memory().percent}% > 90%: warte...")
+            time.sleep(5)
 
-    # Filtere ungültige Ergebnisse
-    results = [res for res in results if res is not None]
+        # Pool öffnen
+        with multiprocessing.Pool(processes=num_processes) as pool:
+            # imap für Ergebnisse in Eingabe-Reihenfolge
+            for br in pool.imap(run_variation_helper, args_list, chunksize=1):
+                if br and br[0] is not None:
+                    results.append(br)
+                    processed_indices.add(br[0])
+                    np.save(save_path, results)
+                    print(f"Ergebnis gespeichert: {br} | {len(results)} Einträge")
+
     if not results:
         raise ValueError("Keine gültigen Ergebnisse")
 
