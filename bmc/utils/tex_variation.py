@@ -66,54 +66,54 @@ def _run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webh
 def run_variation_helper(args):
     return _run_variation(*args)
 
-def run_variation(
-    seq_path_on,
-    seq_path_off,
-    config_path,
-    adc_time,
-    z_pos,
-    webhook,
-    num_points=2,
-    batch_size=10,
-    max_processes=4,
-    save_path="results.npy"
-):
-    """
-    Verteilt die '_run_variation'-Aufrufe auf mehrere Prozesse.
-    Achtet darauf, vor jedem Batch die RAM-Auslastung zu prüfen.
-    Speichert Zwischenergebnisse nach jeder einzelnen Berechnung.
-    """
-    assert len(seq_path_on) == len(seq_path_off), "Listen müssen gleiche Länge haben"
-
-    num_processes = min(multiprocessing.cpu_count(), max_processes)
+def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, num_points=2, batch_size=10, max_processes=4, save_path="results.npy"):
+    assert len(seq_path_on) == len(seq_path_off), "Eingabelisten müssen die gleiche Länge haben"
+    
+    num_processes = min(multiprocessing.cpu_count(), max_processes)  # Begrenze Prozesse
     results = []
 
+    # Lade vorherige Ergebnisse, falls vorhanden
     try:
         results = np.load(save_path, allow_pickle=True).tolist()
         print(f"Geladene Ergebnisse: {len(results)}")
     except FileNotFoundError:
         print("Keine vorherigen Ergebnisse gefunden, starte neu.")
+    
+    # Extrahiere bereits verarbeitete t_ex-Werte
+    processed_indices = set()
+    for res in results:
+        if res is not None:
+            if isinstance(res[0], str):  # Prüfen, ob res[0] ein String (Dateiname) ist
+                match = re.search(r'\d+', res[0])  # Nur wenn es ein String ist
+                if match:
+                    processed_indices.add(int(match.group()))
+            elif isinstance(res[0], (int, float)):  # Falls es bereits ein Index ist
+                processed_indices.add(int(res[0]))
 
-    processed_indices = set(t_ex for t_ex, _ in results if t_ex is not None)
     print(f"Bereits verarbeitete Indizes: {len(processed_indices)}")
 
+    # Batchweise Verarbeitung
     for batch_start in range(0, num_points, batch_size):
         batch_end = min(batch_start + batch_size, num_points)
 
-        args_list = [
-            (
-                seq_path_on[i],
-                seq_path_off[i],
-                config_path,
-                adc_time,
-                z_pos,
-                webhook
-            )
-            for i in range(batch_start, batch_end)
-            if i not in processed_indices
-        ]
+        # Überprüfe, ob Dateien basierend auf t_ex noch verarbeitet werden müssen
+        args_list = []
+        for i in range(batch_start, batch_end):
+            match = re.search(r'\d+', seq_path_on[i])
+            if match:
+                t_ex = int(match.group())
+                if t_ex not in processed_indices:
+                    args_list.append((
+                        seq_path_on[i],
+                        seq_path_off[i],
+                        config_path,
+                        adc_time,
+                        z_pos,
+                        webhook
+                    ))
+
         if not args_list:
-            continue
+            continue 
 
         with multiprocessing.Pool(processes=num_processes) as pool:
             for br in pool.imap(run_variation_helper, args_list, chunksize=1):
