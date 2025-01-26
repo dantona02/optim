@@ -18,7 +18,7 @@ from bmc.utils.webhook import DiscordNotifier
 
 
 class BMCSim(BMCTool):
-    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, z_positions: np.ndarray, verbose: bool = True, write_all_mag: bool = False, webhook: bool = False, **kwargs) -> None:
+    def __init__(self, adc_time: np.float64, params: Params, seq_file: str | Path, z_positions: np.ndarray, n_backlog: str | int, verbose: bool = True, webhook: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         """
         Parameters
@@ -37,19 +37,20 @@ class BMCSim(BMCTool):
         self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets, z_positions=self.z_positions)
         
         self.adc_time = adc_time
-        self.write_all_mag = write_all_mag
+        self.n_backlog = n_backlog
         
-        if self.write_all_mag:
+        if self.n_backlog == "ALL":
+            self.n_backlog = len(self.seq.block_events)
             self.defs["num_meas"] = (self.params.options["max_pulse_samples"] + 1) * len(self.seq.block_events)
         else:
-            self.defs["num_meas"] = (self.params.options["max_pulse_samples"] + 1)
+            self.defs["num_meas"] = (self.params.options["max_pulse_samples"] + 2) * (self.n_backlog + 1)
 
         if "num_meas" in self.defs:
             self.n_measure = int(self.defs["num_meas"]) #redefining n_measure to max_pulse_samples
         else:
             self.n_measure = self.n_offsets
 
-        self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure + 1]) #expanding m_out to the number of max_pulse_samples
+        self.m_out = np.zeros([self.n_isochromats, self.m_init.shape[0], self.n_measure]) #expanding m_out to the number of max_pulse_samples
         self.m_out[:, :, 0] = self.m_init[np.newaxis, :]
 
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
@@ -59,7 +60,7 @@ class BMCSim(BMCTool):
 
         self.webhook = webhook
 
-    def run_adc(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
+    def run_adc(self, block, current_adc, accum_phase, mag, counter) -> Tuple[int, float, np.ndarray]:
         #adc with time dt and max_pulse_sampels
 
         if block.adc is not None:
@@ -80,7 +81,7 @@ class BMCSim(BMCTool):
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
-            if self.write_all_mag:
+            if counter <= self.n_backlog:
                 start_time = self.t[-1]
                 self.events.append(f'rf at {start_time:.4f}s')
                 time_array = start_time + np.arange(1, amp_.size + 1) * dtp_
@@ -97,7 +98,7 @@ class BMCSim(BMCTool):
 
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
 
-                if self.write_all_mag: #might have a slight overhead, can be rewritten in to if else statement
+                if counter <= self.n_backlog: #might have a slight overhead, can be rewritten in to if else statement
                     self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
                 
@@ -105,7 +106,7 @@ class BMCSim(BMCTool):
             if delay_after_pulse > 0: #might cause problems if delay_after_pulse is significantly larger than 0
                 self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
-                if self.write_all_mag:
+                if counter <= self.n_backlog:
                     start_time = self.t[-1]
                     time_array = start_time + np.arange(1, 2) * delay_after_pulse  # Ein Zeitschritt hinzufügen
                     self.t = np.append(self.t, time_array)
@@ -119,7 +120,7 @@ class BMCSim(BMCTool):
         elif block.gz is not None:
             amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
 
-            if self.write_all_mag:
+            if counter <= self.n_backlog:
                 start_time = self.t[-1]
                 self.events.append(f'gz at {start_time:.4f}s')
                 time_array = start_time + np.arange(1, amp_.size + 1) * dtp_
@@ -130,7 +131,7 @@ class BMCSim(BMCTool):
                 self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
 
-                if self.write_all_mag:
+                if counter <= self.n_backlog:
                     self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
                 
@@ -138,7 +139,7 @@ class BMCSim(BMCTool):
                 self.bm_solver.update_matrix(0, 0, 0)
                 
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
-                if self.write_all_mag:
+                if counter <= self.n_backlog:
                     start_time = self.t[-1]
                     time_array = start_time + np.arange(1, 2) * delay_after_grad  # Ein Zeitschritt hinzufügen
                     self.t = np.append(self.t, time_array)
@@ -157,7 +158,7 @@ class BMCSim(BMCTool):
             sample_factor_delay = int(self.params.options["max_pulse_samples"] / 10)
             dt_delay = delay / sample_factor_delay
             
-            if self.write_all_mag:
+            if counter <= self.n_backlog:
                 start_time = self.t[-1]
                 self.events.append(f'delay at {start_time:.4f}s')
                 time_array = start_time + np.arange(1, sample_factor_delay + 1) * dt_delay
@@ -197,7 +198,7 @@ class BMCSim(BMCTool):
             block_events = self.seq.dict_block_events
 
         if self.verbose:
-            loop_block_events = tqdm(range(1, len(block_events) + 1), desc="BMCTool simulation")
+            loop_block_events = tqdm(enumerate(block_events, start=1), total=len(block_events), desc="BMCTool simulation")
         else:
             loop_block_events = range(1, len(block_events) + 1)
 
@@ -214,23 +215,25 @@ class BMCSim(BMCTool):
         # code for pypulseq >= 1.4.0:
         
         try:
+            total_events = len(block_events)
             if self.webhook:
                 start_time = time.time()
-                for i, block_event in enumerate(loop_block_events, start=1):
+                for i, block_event in loop_block_events:
                     block = self.seq.get_block(block_event)
                     current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
                     notifier.update_progress(i)
             else:
-                for block_event in loop_block_events:
+                for i, block_event in loop_block_events:
+                    counter = np.abs(total_events - i)
                     block = self.seq.get_block(block_event)
-                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag, counter)
                 
             self.m_out = self.m_out[:, :, :self.t.size]
             print(self.events)
 
-            unique_elements, counts = np.unique(self.t, return_counts=True)
-            duplicates = unique_elements[counts > 1]
-            print(duplicates)
+            # unique_elements, counts = np.unique(self.t, return_counts=True)
+            # duplicates = unique_elements[counts > 1]
+            # print(duplicates)
 
             if self.webhook:
                 end_time = time.time()

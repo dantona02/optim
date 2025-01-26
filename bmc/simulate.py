@@ -68,8 +68,8 @@ def simulate(config_file: Union[str, Path],
                  z_positions: np.ndarray,
                  adc_time: np.float64,
                  iso_select: Union[list, tuple],
+                 n_backlog: Union[str, int],
                  return_zmag: bool = False,
-                 write_all_mag: bool = False,
                  show_plot: bool = False,
                  webhook: bool = False,
                  plt_range: list = [0, 5],
@@ -109,7 +109,7 @@ def simulate(config_file: Union[str, Path],
     sim_params = load_params(config_file)
 
     # create BMCTool object and run simulation
-    sim = BMCSim(adc_time, sim_params, seq_file, write_all_mag=write_all_mag, z_positions=z_positions, webhook=webhook, **kwargs)
+    sim = BMCSim(adc_time, sim_params, seq_file, n_backlog=n_backlog, z_positions=z_positions, webhook=webhook, **kwargs)
     sim.run_fid()
     
 
