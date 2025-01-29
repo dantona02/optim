@@ -136,8 +136,11 @@ class BlochMcConnellSolver:
         """
         self.params = params
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
-        torch.manual_seed(42)
-        self.dw0 = self.w0 * torch.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], size=(self.n_isochromats,), dtype=torch.float32, device=GLOBAL_DEVICE)
+
+        np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
+        # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
+        self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
+        self.dw0 = torch.tensor(self.dw0, dtype=torch.float32, device=GLOBAL_DEVICE)
         self._init_matrix_a()
         self._init_vector_c()
 
@@ -161,8 +164,8 @@ class BlochMcConnellSolver:
         grad_term = 2 * torch.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
 
         # Set dw0 due to b0 inhomogeneity
-        self.arr_a[:, :, 0, 1 + n_p] = self.dw0.unsqueeze(1)
-        self.arr_a[:, :, 1 + n_p, 0] = -self.dw0.unsqueeze(1)
+        self.arr_a[:, :, 0, 1 + n_p] = -self.dw0.unsqueeze(1) * j
+        self.arr_a[:, :, 1 + n_p, 0] = self.dw0.unsqueeze(1) * j
 
         # Set gradient terms for water pool
         self.arr_a[:, :, 0, 1 + n_p] += grad_term
@@ -198,8 +201,8 @@ class BlochMcConnellSolver:
             self.arr_a[:, :, i + n_p + 1, i] = dwi.unsqueeze(1)
 
             # Add gradient terms for CEST pools
-            self.arr_a[:, :, i, i + n_p + 1] -= grad_term
-            self.arr_a[:, :, i + n_p + 1, i] += grad_term
+            self.arr_a[:, :, i, i + n_p + 1] += grad_term
+            self.arr_a[:, :, i + n_p + 1, i] -= grad_term
 
         # MT pool (if active)
         if self.is_mt_active:
