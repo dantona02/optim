@@ -129,7 +129,10 @@ class BlochMcConnellSolver:
         self.params = params
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
         np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
-        self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
+        # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
+        self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
+        # self.dw0 = self.w0 * np.linspace(params.scanner["b0_inhomogeneity"], -params.scanner["b0_inhomogeneity"], self.n_isochromats)
+        # self.dw0 = self.w0 * self.generate_gaussian_random_field_ppm(1, params.scanner["b0_inhomogeneity"], 40)
         self._init_matrix_a()
         self._init_vector_c()
 
@@ -147,12 +150,12 @@ class BlochMcConnellSolver:
        
 
         # set dw0 due to b0_inhomogeneity
-        self.arr_a[:, :, 0, 1 + n_p] = self.dw0[:, np.newaxis] * j
-        self.arr_a[:, :, 1 + n_p, 0] = -1 * self.dw0[:, np.newaxis] * j
+        self.arr_a[:, :, 0, 1 + n_p] = -self.dw0[:, np.newaxis] * j
+        self.arr_a[:, :, 1 + n_p, 0] = self.dw0[:, np.newaxis] * j
 
         #set dw_grad for water pool
-        self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j??
-        self.arr_a[:, :, 1 + n_p, 0] -= grad_term
+        self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j?? += before
+        self.arr_a[:, :, 1 + n_p, 0] -= grad_term # -= before
 
         # calculate omega_1
         rf_amp_2pi = rf_amp * 2 * np.pi * self.params.scanner["rel_b1"]
@@ -187,8 +190,8 @@ class BlochMcConnellSolver:
             self.arr_a[:, :, i, i + n_p + 1] = -dwi[:, np.newaxis]
             self.arr_a[:, :, i + n_p + 1, i] = dwi[:, np.newaxis]
 
-            self.arr_a[:, :, i, i + n_p + 1] -= grad_term
-            self.arr_a[:, :, i + n_p + 1, i] += grad_term
+            self.arr_a[:, :, i, i + n_p + 1] += grad_term
+            self.arr_a[:, :, i + n_p + 1, i] -= grad_term
 
         # mt_pool
         if self.is_mt_active:
@@ -354,3 +357,43 @@ class BlochMcConnellSolver:
 
             mt_line = h0 * py[1] + h1 * py[2] + h2 * d0y + h3 * d1y
             return mt_line
+
+
+    def generate_gaussian_random_field_ppm(self, xi, sigma_ppm, L):
+        """
+        Generiert ein Gaussian Random Field mit räumlicher Korrelation in ppm.
+
+        Parameter:
+        - N: Anzahl der Isochromaten
+        - xi: Korrelationslänge (in der gleichen räumlichen Einheit wie L, z.B. µm)
+        - sigma_ppm: Standardabweichung der Inhomogenität in ppm
+        - L: Gesamtlänge der z-Achse (z.B. in µm)
+
+        Rückgabe:
+        - field_ppm: Array mit Inhomogenitäten in ppm
+        - z: Positionen der Isochromaten entlang der z-Achse
+        """
+        # Positionen der Isochromaten gleichmäßig verteilt
+        np.random.seed(42)
+        z = np.linspace(-L/2, L/2, self.n_isochromats)
+
+        # Räumliche Auflösung
+        dx = L / self.n_isochromats  # Abstand zwischen Isochromaten
+
+        # Wellenzahlen berechnen
+        k = np.fft.fftfreq(self.n_isochromats, d=dx)  # in 1/µm
+
+        # Gaußsche Power Spectral Density (PSD)
+        S_k = np.exp(-(k**2) * (xi**2))
+
+        # Rausch im Fourier-Raum
+        noise = np.random.normal(scale=1.0, size=self.n_isochromats) + 1j * np.random.normal(scale=1.0, size=self.n_isochromats)
+        field_k = noise * np.sqrt(S_k)
+
+        # Inverse FFT, um das räumliche Feld zu erhalten
+        field_ppm = np.fft.ifft(field_k).real
+
+        # Normalisieren auf die gewünschte Standardabweichung in ppm
+        field_ppm = field_ppm / np.std(field_ppm) * sigma_ppm
+
+        return field_ppm

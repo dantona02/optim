@@ -319,6 +319,9 @@ class BMCSim(BMCTool):
         """
         return self.t
     
+    def print_params(self) -> None:
+        return self.params.print_settings()
+    
 
     def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, **addParams) -> None:
         """
