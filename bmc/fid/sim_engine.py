@@ -38,11 +38,11 @@ class BMCSim(BMCTool):
         else:
             self.n_measure = self.n_offsets
 
-        self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float32, device=GLOBAL_DEVICE)
-        self.m_out[:, :, 0] = torch.tensor(self.m_init, dtype=torch.float32, device=GLOBAL_DEVICE).unsqueeze(0)
+        self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float64, device=GLOBAL_DEVICE)
+        self.m_out[:, :, 0] = torch.tensor(self.m_init, dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0)
 
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
-        self.t = torch.tensor([0], dtype=torch.float32, device=GLOBAL_DEVICE)
+        self.t = torch.tensor([0], dtype=torch.float64, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
 
@@ -79,7 +79,7 @@ class BMCSim(BMCTool):
         if block.adc is not None:
             start_time = self.t[-1].item()
             self.events.append(f'adc at {start_time:.4f}s')
-            time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * self.dt_adc
+            time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * self.dt_adc
             self.t = torch.cat((self.t, time_array))
 
             for step in range(len(time_array)):
@@ -96,7 +96,7 @@ class BMCSim(BMCTool):
             if counter <= self.n_backlog:
                 start_time = self.t[-1].item()
                 self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
                 for i in range(amp_.numel()):
                     self.bm_solver.update_matrix(
@@ -123,7 +123,7 @@ class BMCSim(BMCTool):
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
                 if counter <= self.n_backlog:
                     start_time = self.t[-1].item()
-                    time_array = start_time + torch.arange(1, 2, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_pulse
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
@@ -139,7 +139,7 @@ class BMCSim(BMCTool):
             if counter <= self.n_backlog:
                 start_time = self.t[-1].item()
                 self.events.append(f'gz at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
                 for i in range(amp_.numel()):
                     self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i].item())
@@ -157,7 +157,7 @@ class BMCSim(BMCTool):
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
                 if counter <= self.n_backlog:
                     start_time = self.t[-1].item()
-                    time_array = start_time + torch.arange(1, 2, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_grad
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_grad
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
@@ -170,7 +170,7 @@ class BMCSim(BMCTool):
             if counter <= self.n_backlog:
                 start_time = self.t[-1].item()
                 self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, sample_factor_delay + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dt_delay
+                time_array = start_time + torch.arange(1, sample_factor_delay + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dt_delay
                 self.t = torch.cat((self.t, time_array))
 
                 for step in range(len(time_array)):
@@ -199,7 +199,7 @@ class BMCSim(BMCTool):
 
         mag = torch.tensor(
             self.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
-            dtype=torch.float32,
+            dtype=torch.float64,
             device=GLOBAL_DEVICE
         )
 

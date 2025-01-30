@@ -77,7 +77,7 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
     else:
         raise Exception("Case with 1 < unique samples < max_pulse_samples not implemented yet. Sorry :(")
 
-    return amp_, ph_, dtp_, delay_after_pulse
+    return amp_.to(dtype=torch.float64), ph_.to(dtype=torch.float64), dtp_, delay_after_pulse
 
 def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[torch.Tensor, float, float]:
     """
@@ -100,10 +100,10 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
     Exception
         If the number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet).
     """
-    amp = torch.tensor(block.gz.waveform, dtype=torch.float32, device=GLOBAL_DEVICE).abs()
+    amp = torch.tensor(block.gz.waveform, dtype=torch.float64, device=GLOBAL_DEVICE).abs()
     idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
 
-    amp = torch.tensor(block.gz.waveform, dtype=torch.float32, device=GLOBAL_DEVICE)
+    amp = torch.tensor(block.gz.waveform, dtype=torch.float64, device=GLOBAL_DEVICE)
 
     try:
         grad_length = amp.size(0)
