@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 24-Jan-2025 16:04:19
+# Created at: 03-Feb-2025 13:27:22
 
 [VERSION]
 major 1
@@ -17,87 +17,67 @@ B0 17
 BlockDurationRaster 1e-05 
 FREQ 723.7988 
 GradientRasterTime 1e-05 
-M0_offset -10 
+M0_offset -100 
 RadiofrequencyRasterTime 1e-06 
-TotalDuration 4.0585 
+TotalDuration 4.0485 
 a 90 
 n_ETM 10 
 num_meas 1 
-offsets_ppm -10 
-seq_id_string ['tex_2ms_minus', 'tex_4ms_minus', 'tex_8ms_minus', 'tex_12ms_minus', 'tex_16ms_minus', 'tex_20ms_minus', 'tex_25ms_minus', 'tex_30ms_minus', 'tex_35ms_minus', 'tex_40ms_minus', 'tex_45ms_minus', 'tex_60ms_minus', 'tex_80ms_minus', 'tex_120ms_minus', 'tex_160ms_minus', 'tex_200ms_minus', 'tex_300ms_minus', 'tex_400ms_minus', 'tex_500ms_minus'] 
+offsets_ppm -100 
+seq_id_string ['tex_2ms_minus', 'tex_4ms_minus', 'tex_6ms_minus', 'tex_8ms_minus', 'tex_10ms_minus', 'tex_12ms_minus', 'tex_14ms_minus', 'tex_16ms_minus', 'tex_18ms_minus', 'tex_20ms_minus', 'tex_22ms_minus', 'tex_24ms_minus', 'tex_26ms_minus', 'tex_28ms_minus', 'tex_30ms_minus', 'tex_32ms_minus', 'tex_34ms_minus', 'tex_36ms_minus', 'tex_38ms_minus', 'tex_40ms_minus', 'tex_42ms_minus', 'tex_44ms_minus', 'tex_46ms_minus', 'tex_48ms_minus', 'tex_50ms_minus', 'tex_52ms_minus', 'tex_54ms_minus', 'tex_56ms_minus', 'tex_58ms_minus', 'tex_60ms_minus', 'tex_62ms_minus', 'tex_64ms_minus', 'tex_66ms_minus', 'tex_68ms_minus', 'tex_70ms_minus', 'tex_72ms_minus', 'tex_74ms_minus', 'tex_76ms_minus', 'tex_78ms_minus', 'tex_80ms_minus', 'tex_82ms_minus', 'tex_84ms_minus', 'tex_86ms_minus', 'tex_88ms_minus', 'tex_90ms_minus', 'tex_92ms_minus', 'tex_94ms_minus', 'tex_96ms_minus', 'tex_98ms_minus', 'tex_100ms_minus', 'tex_102ms_minus', 'tex_104ms_minus', 'tex_106ms_minus', 'tex_108ms_minus', 'tex_110ms_minus', 'tex_112ms_minus', 'tex_114ms_minus', 'tex_116ms_minus', 'tex_118ms_minus', 'tex_120ms_minus', 'tex_122ms_minus', 'tex_124ms_minus', 'tex_126ms_minus', 'tex_128ms_minus', 'tex_130ms_minus', 'tex_132ms_minus', 'tex_134ms_minus', 'tex_136ms_minus', 'tex_138ms_minus', 'tex_140ms_minus', 'tex_142ms_minus', 'tex_144ms_minus', 'tex_146ms_minus', 'tex_148ms_minus', 'tex_150ms_minus', 'tex_152ms_minus', 'tex_154ms_minus', 'tex_156ms_minus', 'tex_158ms_minus', 'tex_160ms_minus', 'tex_162ms_minus', 'tex_164ms_minus', 'tex_166ms_minus', 'tex_168ms_minus', 'tex_170ms_minus', 'tex_172ms_minus', 'tex_174ms_minus', 'tex_176ms_minus', 'tex_178ms_minus', 'tex_180ms_minus', 'tex_182ms_minus', 'tex_184ms_minus', 'tex_186ms_minus', 'tex_188ms_minus', 'tex_190ms_minus', 'tex_192ms_minus', 'tex_194ms_minus', 'tex_196ms_minus', 'tex_198ms_minus', 'tex_200ms_minus', 'tex_202ms_minus', 'tex_204ms_minus', 'tex_206ms_minus', 'tex_208ms_minus', 'tex_210ms_minus', 'tex_212ms_minus', 'tex_214ms_minus', 'tex_216ms_minus', 'tex_218ms_minus', 'tex_220ms_minus', 'tex_222ms_minus', 'tex_224ms_minus', 'tex_226ms_minus', 'tex_228ms_minus', 'tex_230ms_minus', 'tex_232ms_minus', 'tex_234ms_minus', 'tex_236ms_minus', 'tex_238ms_minus', 'tex_240ms_minus', 'tex_242ms_minus', 'tex_244ms_minus', 'tex_246ms_minus', 'tex_248ms_minus', 'tex_250ms_minus', 'tex_252ms_minus', 'tex_254ms_minus', 'tex_256ms_minus', 'tex_258ms_minus', 'tex_260ms_minus', 'tex_262ms_minus', 'tex_264ms_minus', 'tex_266ms_minus', 'tex_268ms_minus', 'tex_270ms_minus', 'tex_272ms_minus', 'tex_274ms_minus', 'tex_276ms_minus', 'tex_278ms_minus', 'tex_280ms_minus', 'tex_282ms_minus', 'tex_284ms_minus', 'tex_286ms_minus', 'tex_288ms_minus', 'tex_290ms_minus', 'tex_292ms_minus', 'tex_294ms_minus', 'tex_296ms_minus', 'tex_298ms_minus', 'tex_300ms_minus', 'tex_302ms_minus', 'tex_304ms_minus', 'tex_306ms_minus', 'tex_308ms_minus', 'tex_310ms_minus', 'tex_312ms_minus', 'tex_314ms_minus', 'tex_316ms_minus', 'tex_318ms_minus', 'tex_320ms_minus', 'tex_322ms_minus', 'tex_324ms_minus', 'tex_326ms_minus', 'tex_328ms_minus', 'tex_330ms_minus', 'tex_332ms_minus', 'tex_334ms_minus', 'tex_336ms_minus', 'tex_338ms_minus', 'tex_340ms_minus', 'tex_342ms_minus', 'tex_344ms_minus', 'tex_346ms_minus', 'tex_348ms_minus', 'tex_350ms_minus', 'tex_352ms_minus', 'tex_354ms_minus', 'tex_356ms_minus', 'tex_358ms_minus', 'tex_360ms_minus', 'tex_362ms_minus', 'tex_364ms_minus', 'tex_366ms_minus', 'tex_368ms_minus', 'tex_370ms_minus', 'tex_372ms_minus', 'tex_374ms_minus', 'tex_376ms_minus', 'tex_378ms_minus', 'tex_380ms_minus', 'tex_382ms_minus', 'tex_384ms_minus', 'tex_386ms_minus', 'tex_388ms_minus', 'tex_390ms_minus', 'tex_392ms_minus', 'tex_394ms_minus', 'tex_396ms_minus', 'tex_398ms_minus', 'tex_400ms_minus', 'tex_402ms_minus', 'tex_404ms_minus', 'tex_406ms_minus', 'tex_408ms_minus', 'tex_410ms_minus', 'tex_412ms_minus', 'tex_414ms_minus', 'tex_416ms_minus', 'tex_418ms_minus', 'tex_420ms_minus', 'tex_422ms_minus', 'tex_424ms_minus', 'tex_426ms_minus', 'tex_428ms_minus', 'tex_430ms_minus', 'tex_432ms_minus', 'tex_434ms_minus', 'tex_436ms_minus', 'tex_438ms_minus', 'tex_440ms_minus', 'tex_442ms_minus', 'tex_444ms_minus', 'tex_446ms_minus', 'tex_448ms_minus', 'tex_450ms_minus', 'tex_452ms_minus', 'tex_454ms_minus', 'tex_456ms_minus', 'tex_458ms_minus', 'tex_460ms_minus', 'tex_462ms_minus', 'tex_464ms_minus', 'tex_466ms_minus', 'tex_468ms_minus', 'tex_470ms_minus', 'tex_472ms_minus', 'tex_474ms_minus', 'tex_476ms_minus', 'tex_478ms_minus', 'tex_480ms_minus', 'tex_482ms_minus', 'tex_484ms_minus', 'tex_486ms_minus', 'tex_488ms_minus', 'tex_490ms_minus', 'tex_492ms_minus', 'tex_494ms_minus', 'tex_496ms_minus', 'tex_498ms_minus', 'tex_500ms_minus'] 
 
 # Format of blocks:
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
 [BLOCKS]
  1 200   1   0   0   0  0  0
- 2  50   0   0   0   0  0  0
- 3  50   0   0   0   1  0  0
- 4  50   0   0   0   0  0  0
+ 2  50   0   0   0   1  0  0
+ 3 200   1   0   0   0  0  0
+ 4 40000   0   0   0   0  0  0
  5 200   1   0   0   0  0  0
- 6 40000   0   0   0   0  0  0
+ 6  50   0   0   0   1  0  0
  7 200   1   0   0   0  0  0
- 8  50   0   0   0   0  0  0
- 9  50   0   0   0   1  0  0
-10  50   0   0   0   0  0  0
+ 8 40000   0   0   0   0  0  0
+ 9 200   1   0   0   0  0  0
+10  50   0   0   0   1  0  0
 11 200   1   0   0   0  0  0
 12 40000   0   0   0   0  0  0
 13 200   1   0   0   0  0  0
-14  50   0   0   0   0  0  0
-15  50   0   0   0   1  0  0
-16  50   0   0   0   0  0  0
+14  50   0   0   0   1  0  0
+15 200   1   0   0   0  0  0
+16 40000   0   0   0   0  0  0
 17 200   1   0   0   0  0  0
-18 40000   0   0   0   0  0  0
+18  50   0   0   0   1  0  0
 19 200   1   0   0   0  0  0
-20  50   0   0   0   0  0  0
-21  50   0   0   0   1  0  0
-22  50   0   0   0   0  0  0
+20 40000   0   0   0   0  0  0
+21 200   1   0   0   0  0  0
+22  50   0   0   0   1  0  0
 23 200   1   0   0   0  0  0
 24 40000   0   0   0   0  0  0
 25 200   1   0   0   0  0  0
-26  50   0   0   0   0  0  0
-27  50   0   0   0   1  0  0
-28  50   0   0   0   0  0  0
+26  50   0   0   0   1  0  0
+27 200   1   0   0   0  0  0
+28 40000   0   0   0   0  0  0
 29 200   1   0   0   0  0  0
-30 40000   0   0   0   0  0  0
+30  50   0   0   0   1  0  0
 31 200   1   0   0   0  0  0
-32  50   0   0   0   0  0  0
-33  50   0   0   0   1  0  0
-34  50   0   0   0   0  0  0
+32 40000   0   0   0   0  0  0
+33 200   1   0   0   0  0  0
+34  50   0   0   0   1  0  0
 35 200   1   0   0   0  0  0
 36 40000   0   0   0   0  0  0
 37 200   1   0   0   0  0  0
-38  50   0   0   0   0  0  0
-39  50   0   0   0   1  0  0
-40  50   0   0   0   0  0  0
-41 200   1   0   0   0  0  0
-42 40000   0   0   0   0  0  0
-43 200   1   0   0   0  0  0
-44  50   0   0   0   0  0  0
-45  50   0   0   0   1  0  0
-46  50   0   0   0   0  0  0
-47 200   1   0   0   0  0  0
-48 40000   0   0   0   0  0  0
-49 200   1   0   0   0  0  0
-50  50   0   0   0   0  0  0
-51  50   0   0   0   1  0  0
-52  50   0   0   0   0  0  0
-53 200   1   0   0   0  0  0
-54 40000   0   0   0   0  0  0
-55 200   1   0   0   0  0  0
-56  50   0   0   0   0  0  0
-57  50   0   0   0   1  0  0
-58  50   0   0   0   0  0  0
-59 200   1   0   0   0  0  0
-60 40000   0   0   0   0  0  0
-61 200   2   0   0   0  0  0
-62  50   0   0   0   1  0  0
-63 100   0   0   0   0  1  0
+38  50   0   0   0   1  0  0
+39 200   1   0   0   0  0  0
+40 40000   0   0   0   0  0  0
+41 200   2   0   0   0  0  0
+42  50   0   0   0   1  0  0
+43 100   0   0   0   0  1  0
 
 # Format of RF events:
 # id amplitude mag_id phase_id time_shape_id delay freq phase
 # ..        Hz   ....     ....          ....    us   Hz   rad
 [RF]
-1      499.999 1 2 0 0 -7237.99 0
+1      499.999 1 2 0 0 -72379.9 0
 2      499.999 1 2 0 0 0 0
 
 # Format of arbitrary gradients:
@@ -2197,4 +2177,4 @@ num_samples 500
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 94bfb92480098f4ac82990958544856a
+Hash e5dda72439cccceb9f1c4f9d1623cd0e
