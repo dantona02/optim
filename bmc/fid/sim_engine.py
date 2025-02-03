@@ -108,7 +108,7 @@ class BMCSim(BMCTool):
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
                 if counter <= self.n_backlog:
                     start_time = self.t[-1]
-                    time_array = start_time + np.arange(1, 2) * delay_after_pulse  # Ein Zeitschritt hinzufügen
+                    time_array = start_time + np.arange(1, 2) * delay_after_pulse  # Add one time step
                     self.t = np.append(self.t, time_array)
                     self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1
@@ -141,7 +141,7 @@ class BMCSim(BMCTool):
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
                 if counter <= self.n_backlog:
                     start_time = self.t[-1]
-                    time_array = start_time + np.arange(1, 2) * delay_after_grad  # Ein Zeitschritt hinzufügen
+                    time_array = start_time + np.arange(1, 2) * delay_after_grad  # Add one time step
                     self.t = np.append(self.t, time_array)
                     self.m_out[:, :, current_adc] = np.squeeze(mag)
                     current_adc += 1

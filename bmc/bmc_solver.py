@@ -154,8 +154,8 @@ class BlochMcConnellSolver:
         self.arr_a[:, :, 1 + n_p, 0] = self.dw0[:, np.newaxis] * j
 
         #set dw_grad for water pool
-        self.arr_a[:, :, 0, 1 + n_p] += grad_term #multiply by j?? += before
-        self.arr_a[:, :, 1 + n_p, 0] -= grad_term # -= before
+        self.arr_a[:, :, 0, 1 + n_p] += grad_term
+        self.arr_a[:, :, 1 + n_p, 0] -= grad_term 
 
         # calculate omega_1
         rf_amp_2pi = rf_amp * 2 * np.pi * self.params.scanner["rel_b1"]
