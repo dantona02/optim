@@ -3,8 +3,9 @@ import numpy as np
 import multiprocessing
 from bmc.simulate import simulate
 import gc
+import matplotlib.pyplot as plt
 
-def _run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook):
+def _run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot):
     try:
         t_ex = 0
 
@@ -26,7 +27,7 @@ def _run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webh
             webhook=webhook,
             plt_range=None
         )
-        _, _, _, _, m_complex_on = sim_on.get_mag(return_cest_pool=False)
+        t, _, _, _, m_complex_on = sim_on.get_mag(return_cest_pool=False)
         m_on = np.abs(m_complex_on[-600:])
         
         del m_complex_on, sim_on
@@ -59,7 +60,12 @@ def _run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webh
         signal_corrected = m_on - m_off
         signal = np.max(signal_corrected)
 
-        del m_on, m_off, signal_corrected
+        if show_plot:
+            plt.plot(t[-600:], signal_corrected, 'o', c='blue', markersize=1)
+            plt.axhline(0, c='black')
+            plt.show()
+
+        del m_on, m_off, signal_corrected, t
         gc.collect()
 
         return t_ex, signal
@@ -73,7 +79,7 @@ def run_variation_helper(args):
 
 def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook,
                   num_points=2, batch_size=10, max_processes=4, save_path="results.npy",
-                  save_to_file=True):
+                  save_to_file=True, show_plot=False):
     """
     Executes simulation variations.
 
@@ -135,7 +141,8 @@ def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webho
                         config_path,
                         adc_time,
                         z_pos,
-                        webhook
+                        webhook,
+                        show_plot
                     ))
 
         if not args_list:
@@ -156,3 +163,80 @@ def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webho
 
     t_ex, signal = zip(*results)
     return np.array(t_ex), np.array(signal)
+
+
+def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
+    """
+    Führt eine Simulation durch und gibt je nach get_t entweder
+    (t, m) oder nur m zurück.
+    """
+    sim = simulate(
+        config_file=config_path,
+        seq_file=seq_path,
+        adc_time=adc_time,
+        z_positions=z_pos,
+        return_zmag=False,
+        iso_select=[0],
+        show_plot=False,
+        n_backlog=2,
+        webhook=webhook,
+        plt_range=plt_range
+    )
+    # get_mag liefert üblicherweise (t, _, _, _, m_complex)
+    res = sim.get_mag(return_cest_pool=False)
+    if get_t:
+        t, _, _, _, m_complex = res
+    else:
+        _, _, _, _, m_complex = res
+    m = np.abs(m_complex[-600:])  # letzte 600 Werte
+    return (t, m) if get_t else m
+
+def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot):
+    try:
+        # Extrahiere t_ex aus dem Dateinamen der on-Sequenz
+        t_ex = 0
+        match = re.search(r'\d+', seq_path_on)
+        if match:
+            t_ex = int(match.group())
+
+        # Starte beide Simulationen parallel mittels Multiprocessing
+        num_processes = 2  # ein Prozess für "on", einer für "off"
+        pool = multiprocessing.Pool(processes=num_processes)
+        
+        async_on = pool.apply_async(
+            run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
+        )
+        async_off = pool.apply_async(
+            run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, False)
+        )
+        pool.close()
+        pool.join()
+
+        on_result = async_on.get()   # Gibt (t, m_on) zurück
+        off_result = async_off.get()  # Gibt m_off zurück
+
+        # on_result ist ein Tupel (t, m_on)
+        t, m_on = on_result
+        m_off = off_result
+
+        # Überprüfe, ob die Arrays die erwartete Größe haben
+        if len(m_on) != 600 or len(m_off) != 600:
+            raise ValueError(f"Arrays too small: m_on={len(m_on)}, m_off={len(m_off)}")
+
+        # Berechne die korrigierte Signaldifferenz und ermittle den Maximalwert
+        signal_corrected = m_on - m_off
+        signal = np.max(signal_corrected)
+
+        if show_plot:
+            plt.plot(t[-600:], signal_corrected, 'o', c='blue', markersize=1)
+            plt.axhline(0, c='black')
+            plt.show()
+
+        del m_on, m_off, signal_corrected, t
+        gc.collect()
+
+        return t_ex, signal
+
+    except Exception as e:
+        print(f"Error during processing: {e}")
+        return None, None

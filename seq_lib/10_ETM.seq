@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 04-Feb-2025 16:48:49
+# Created at: 04-Feb-2025 22:59:40
 
 [VERSION]
 major 1
@@ -32,23 +32,23 @@ seq_id_string 10_ETM
  1 200   1   0   0   0  0  0
  2  50   0   0   0   1  0  0
  3 200   1   0   0   0  0  0
- 4 8000   0   0   0   0  0  0
+ 4 8000   0   0   0   2  0  0
  5 200   1   0   0   0  0  0
  6  50   0   0   0   1  0  0
  7 200   1   0   0   0  0  0
- 8 8000   0   0   0   0  0  0
+ 8 8000   0   0   0   2  0  0
  9 200   1   0   0   0  0  0
 10  50   0   0   0   1  0  0
 11 200   1   0   0   0  0  0
-12 8000   0   0   0   0  0  0
+12 8000   0   0   0   2  0  0
 13 200   1   0   0   0  0  0
 14  50   0   0   0   1  0  0
 15 200   1   0   0   0  0  0
-16 8000   0   0   0   0  0  0
+16 8000   0   0   0   2  0  0
 17 200   1   0   0   0  0  0
 18  50   0   0   0   1  0  0
 19 200   1   0   0   0  0  0
-20 8000   0   0   0   0  0  0
+20 8000   0   0   0   2  0  0
 21 200   2   0   0   0  0  0
 22  50   0   0   0   1  0  0
 23 100   0   0   0   0  1  0
@@ -66,6 +66,7 @@ seq_id_string 10_ETM
 # ..      Hz/m       ..         ..          us
 [GRADIENTS]
 1  5.56899e+07 3 4 0
+2   1.1138e+08 5 6 0
 
 # Format of ADC events:
 # id num dwell delay freq phase
@@ -2151,10 +2152,88 @@ num_samples 500
 0.1
 497
 
+shape_id 5
+num_samples 80000
+0
+0.02
+0.02
+48
+0
+0
+79898
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+
+shape_id 6
+num_samples 80000
+0.05
+0.1
+0.1
+79997
+
 
 [SIGNATURE]
 # This is the hash of the Pulseq file, calculated right before the [SIGNATURE] section was added
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 1709888f66ce6a4f073ac377cbd53000
+Hash d2c11d1c0a04870c19a0c9228a37788e
