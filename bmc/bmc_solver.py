@@ -144,7 +144,7 @@ class BlochMcConnellSolver:
         self._init_matrix_a()
         self._init_vector_c()
 
-    def update_matrix(self, rf_amp: float, rf_phase: float, rf_freq: float, grad_amp: float = 0) -> None:
+    def update_matrix(self, rf_amp: torch.Tensor, rf_phase: torch.Tensor, rf_freq: float, grad_amp: torch.Tensor = torch.tensor(0, dtype=torch.float64, device=GLOBAL_DEVICE)) -> None:
         """
         Updates matrix self.A according to given parameters.
 
@@ -172,9 +172,11 @@ class BlochMcConnellSolver:
         self.arr_a[:, :, 1 + n_p, 0] -= grad_term
 
         # Calculate omega_1
+        if not isinstance(rf_phase, torch.Tensor):
+            rf_phase = torch.tensor(rf_phase, dtype=torch.float64, device=GLOBAL_DEVICE)
         rf_amp_2pi = rf_amp * 2 * torch.pi * self.params.scanner["rel_b1"]
-        rf_amp_2pi_sin = rf_amp_2pi * torch.sin(torch.tensor(rf_phase, dtype=torch.float64, device=GLOBAL_DEVICE))
-        rf_amp_2pi_cos = rf_amp_2pi * torch.cos(torch.tensor(rf_phase, dtype=torch.float64, device=GLOBAL_DEVICE))
+        rf_amp_2pi_sin = rf_amp_2pi * torch.sin(rf_phase.clone().detach())
+        rf_amp_2pi_cos = rf_amp_2pi * torch.cos(rf_phase.clone().detach())
 
         # Set omega_1 for water pool
         self.arr_a[:, :, 0, 2 * (n_p + 1)] = -rf_amp_2pi_sin
