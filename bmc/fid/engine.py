@@ -80,15 +80,22 @@ class BMCSim(BMCTool):
         if block.adc is not None:
             start_time = self.t[-1]
             self.events.append(f'adc at {start_time.item():.4f}s')
-            time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * self.dt_adc
-            self.t = torch.cat((self.t, time_array))
 
-            for step in range(len(time_array)):
-                self.bm_solver.update_matrix(0, 0, 0)  # No RF amplitude, phase, or frequency
+            new_time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, 
+                                                    dtype=torch.float64, device=GLOBAL_DEVICE) * self.dt_adc
+            local_t = torch.cat((self.t, new_time_array))
+            adc_outputs = []
+            
+            for _ in range(len(new_time_array)):
+                self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
-                self.m_out[:, :, current_adc] = mag.squeeze()
+                adc_outputs.append(mag.squeeze())
                 accum_phase = 0
                 current_adc += 1
+
+            self.t = local_t
+            new_adc_out = torch.stack(adc_outputs, dim=2)
+            self.m_out = torch.cat((self.m_out, new_adc_out), dim=2)
             
         # RF pulse
         elif block.rf is not None:
