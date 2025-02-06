@@ -22,7 +22,7 @@ class BMCSim(BMCTool):
     def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, n_backlog: str | int, verbose: bool = True, webhook: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         self.z_positions = z_positions.to(GLOBAL_DEVICE, torch.float32)  # Torch-Tensor
-        print(self.z_positions.dtype)
+        # print(self.z_positions.dtype)
         self.n_isochromats = len(self.z_positions)
         self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets, z_positions=self.z_positions)
         
