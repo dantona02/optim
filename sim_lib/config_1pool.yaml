@@ -44,15 +44,15 @@ water_pool: {
 # }
 
 # CEST
-cest_pool: {  
- 'amide': {
-   f: 0.00064865, # 72e-3 / 111,
-   t1: 1.3,
-   t2: 0.1,
-   k: 50,
-   dw: 100
-  }
-}
+# cest_pool: {  
+#  'amide': {
+#    f: 0.00064865, # 72e-3 / 111,
+#    t1: 1.3,
+#    t2: 0.1,
+#    k: 50,
+#    dw: 100
+#   }
+# }
 
 ###### Scanner settings
 #       b0: field strength [T] (float)
