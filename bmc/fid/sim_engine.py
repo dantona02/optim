@@ -7,6 +7,7 @@ from bmc.utils.global_device import GLOBAL_DEVICE
 from datetime import timedelta
 
 from typing import Tuple, Union
+# from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.bmc_tool import BMCTool
 from bmc.bmc_tool import prep_rf_simulation, prep_grad_simulation
@@ -20,7 +21,8 @@ from bmc.utils.webhook import DiscordNotifier
 class BMCSim(BMCTool):
     def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, n_backlog: str | int, verbose: bool = True, webhook: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
-        self.z_positions = z_positions.to(GLOBAL_DEVICE)  # Torch-Tensor
+        self.z_positions = z_positions.to(GLOBAL_DEVICE, torch.float64)  # Torch-Tensor
+        # print(self.z_positions.dtype)
         self.n_isochromats = len(self.z_positions)
         self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets, z_positions=self.z_positions)
         
@@ -38,11 +40,11 @@ class BMCSim(BMCTool):
         else:
             self.n_measure = self.n_offsets
 
-        self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float32, device=GLOBAL_DEVICE)
-        self.m_out[:, :, 0] = torch.tensor(self.m_init, dtype=torch.float32, device=GLOBAL_DEVICE).unsqueeze(0)
+        self.m_out = torch.zeros(self.n_isochromats, self.m_init.shape[0], self.n_measure, dtype=torch.float64, device=GLOBAL_DEVICE)
+        self.m_out[:, :, 0] = torch.tensor(self.m_init, dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0)
 
         self.dt_adc = self.adc_time / self.params.options["max_pulse_samples"]
-        self.t = torch.tensor([0], dtype=torch.float32, device=GLOBAL_DEVICE)
+        self.t = torch.tensor([0], dtype=torch.float64, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
 
@@ -77,9 +79,9 @@ class BMCSim(BMCTool):
 
         # ADC
         if block.adc is not None:
-            start_time = self.t[-1].item()
-            self.events.append(f'adc at {start_time:.4f}s')
-            time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * self.dt_adc
+            start_time = self.t[-1]
+            self.events.append(f'adc at {start_time.item():.4f}s')
+            time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * self.dt_adc
             self.t = torch.cat((self.t, time_array))
 
             for step in range(len(time_array)):
@@ -94,36 +96,27 @@ class BMCSim(BMCTool):
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
             if counter <= self.n_backlog:
-                start_time = self.t[-1].item()
-                self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                start_time = self.t[-1]
+                self.events.append(f'rf at {start_time.item():.4f}s')
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
-                for i in range(amp_.numel()):
-                    self.bm_solver.update_matrix(
-                        rf_amp=amp_[i].item(),
-                        rf_phase=-ph_[i].item() + block.rf.phase_offset - accum_phase,
-                        rf_freq=block.rf.freq_offset,
-                    )
-                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+            for i in range(amp_.numel()):
+                self.bm_solver.update_matrix(
+                    rf_amp=amp_[i],
+                    rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
+                    rf_freq=block.rf.freq_offset,
+                )
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                if counter <= self.n_backlog:
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
-            else:
-                for i in range(amp_.numel()):
-                    self.bm_solver.update_matrix(
-                        rf_amp=amp_[i].item(),
-                        rf_phase=-ph_[i].item() + block.rf.phase_offset - accum_phase,
-                        rf_freq=block.rf.freq_offset,
-                    )
-                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
-                    current_adc += 1
-                
 
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
                 if counter <= self.n_backlog:
-                    start_time = self.t[-1].item()
-                    time_array = start_time + torch.arange(1, 2, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_pulse
+                    start_time = self.t[-1]
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
@@ -137,27 +130,23 @@ class BMCSim(BMCTool):
             amp_, dtp_, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"])
 
             if counter <= self.n_backlog:
-                start_time = self.t[-1].item()
-                self.events.append(f'gz at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dtp_
+                start_time = self.t[-1]
+                self.events.append(f'gz at {start_time.item():.4f}s')
+                time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
-                for i in range(amp_.numel()):
-                    self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i].item())
-                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+            for i in range(amp_.numel()):
+                self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                if counter <= self.n_backlog:
                     self.m_out[:, :, current_adc] = mag.squeeze()
-                    current_adc += 1
-            else:
-                for i in range(amp_.numel()):
-                    self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i].item())
-                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                     current_adc += 1
 
             if delay_after_grad > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
                 if counter <= self.n_backlog:
-                    start_time = self.t[-1].item()
-                    time_array = start_time + torch.arange(1, 2, dtype=torch.float32, device=GLOBAL_DEVICE) * delay_after_grad
+                    start_time = self.t[-1]
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_grad
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
@@ -168,9 +157,9 @@ class BMCSim(BMCTool):
             sample_factor_delay = int(self.params.options["max_pulse_samples"] / 10)
             dt_delay = delay / sample_factor_delay
             if counter <= self.n_backlog:
-                start_time = self.t[-1].item()
-                self.events.append(f'rf at {start_time:.4f}s')
-                time_array = start_time + torch.arange(1, sample_factor_delay + 1, dtype=torch.float32, device=GLOBAL_DEVICE) * dt_delay
+                start_time = self.t[-1]
+                self.events.append(f'rf at {start_time.item():.4f}s')
+                time_array = start_time + torch.arange(1, sample_factor_delay + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dt_delay
                 self.t = torch.cat((self.t, time_array))
 
                 for step in range(len(time_array)):
@@ -199,7 +188,7 @@ class BMCSim(BMCTool):
 
         mag = torch.tensor(
             self.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
-            dtype=torch.float32,
+            dtype=torch.float64,
             device=GLOBAL_DEVICE
         )
 
@@ -219,7 +208,8 @@ class BMCSim(BMCTool):
                                     seq_file=self.seq_file,
                                     n_cest_pools=len(self.params.cest_pools),
                                     n_isochromats=self.n_isochromats,
-                                    device=f"{GLOBAL_DEVICE.type} - {torch.cuda.get_device_name(GLOBAL_DEVICE.index)}"
+                                    #device=f"{GLOBAL_DEVICE.type} - {torch.cuda.get_device_name(GLOBAL_DEVICE.index)}"
+                                    device=f"{GLOBAL_DEVICE.type}"
                                     )
             notifier.send_initial_embed()
 
@@ -290,9 +280,9 @@ class BMCSim(BMCTool):
 
         else:
 
-            m_x = self.m_out[:, 0, :]
-            m_y = self.m_out[:, n_total_pools, :]
-            m_z = self.m_out[:, self.params.mz_loc, :]
+            m_x = self.m_out[:, 0, :].double()
+            m_y = self.m_out[:, n_total_pools, :].double()
+            m_z = self.m_out[:, self.params.mz_loc, :].double()
 
             m_x_total = torch.sum(m_x, dim=0)
             m_y_total = torch.sum(m_y, dim=0)
@@ -340,7 +330,8 @@ class BMCSim(BMCTool):
 
         time = self.t[::step].cpu()
         self.m_out = self.m_out.cpu()
-        self.total_vec = self.total_vec.cpu()
+        if total_mag is not None:
+            self.total_vec = self.total_vec.cpu()
         self.z_positions = self.z_positions.cpu()
         isochromats = self.n_isochromats
 
@@ -368,7 +359,8 @@ class BMCSim(BMCTool):
         
         
         m_vec_water = m_vec_water[:, ::step]
-        m_vec_total = m_vec_total[::step]  # Schrittweite anwenden
+        if m_vec_total is not None:
+            m_vec_total = m_vec_total[::step]
         middle_idx = np.where(self.z_positions == 0)[0][0]
         m_vec_middle = m_vec_water[middle_idx] if total_mag else None
         render_params = {

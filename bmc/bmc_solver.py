@@ -43,7 +43,7 @@ class BlochMcConnellSolver:
 
         self.dw_tensors = torch.tensor(
             [pool["dw"] for pool in params.cest_pools],
-            dtype=torch.float32,
+            dtype=torch.float64,
             device=GLOBAL_DEVICE
         )
 
@@ -54,7 +54,7 @@ class BlochMcConnellSolver:
         Initialize self.arr_a with all parameters from self.params.
         """
         n_p = self.n_pools
-        self.arr_a = torch.zeros([self.size, self.size], dtype=torch.float32, device=GLOBAL_DEVICE)
+        self.arr_a = torch.zeros([self.size, self.size], dtype=torch.float64, device=GLOBAL_DEVICE)
 
         # Set mt_pool parameters
         k_ac = 0.0
@@ -109,7 +109,7 @@ class BlochMcConnellSolver:
         Initialize vector self.C with all parameters from self.params.
         """
         n_p = self.n_pools
-        self.arr_c = torch.zeros([self.size], dtype=torch.float32, device=GLOBAL_DEVICE)
+        self.arr_c = torch.zeros([self.size], dtype=torch.float64, device=GLOBAL_DEVICE)
 
         # Set water pool parameters
         self.arr_c[(n_p + 1) * 2] = self.params.water_pool["f"] * self.params.water_pool["r1"]
@@ -140,11 +140,11 @@ class BlochMcConnellSolver:
         np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
         self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
-        self.dw0 = torch.tensor(self.dw0, dtype=torch.float32, device=GLOBAL_DEVICE)
+        self.dw0 = torch.tensor(self.dw0, dtype=torch.float64, device=GLOBAL_DEVICE)
         self._init_matrix_a()
         self._init_vector_c()
 
-    def update_matrix(self, rf_amp: float, rf_phase: float, rf_freq: float, grad_amp: float = 0) -> None:
+    def update_matrix(self, rf_amp: float, rf_phase: torch.Tensor, rf_freq: float, grad_amp: float = 0) -> None:
         """
         Updates matrix self.A according to given parameters.
 
@@ -162,6 +162,8 @@ class BlochMcConnellSolver:
         j = self.first_dim  # size of first dimension (=1 for sequential, n_offsets for parallel)
         n_p = self.n_pools
         grad_term = 2 * torch.pi * grad_amp * self.z_positions.reshape(self.n_isochromats, self.n_offsets)
+        if not isinstance(rf_phase, torch.Tensor):
+            rf_phase = torch.tensor(rf_phase, dtype=torch.float64, device=GLOBAL_DEVICE)
 
         # Set dw0 due to b0 inhomogeneity
         self.arr_a[:, :, 0, 1 + n_p] = -self.dw0.unsqueeze(1) * j
@@ -173,8 +175,8 @@ class BlochMcConnellSolver:
 
         # Calculate omega_1
         rf_amp_2pi = rf_amp * 2 * torch.pi * self.params.scanner["rel_b1"]
-        rf_amp_2pi_sin = rf_amp_2pi * torch.sin(torch.tensor(rf_phase, dtype=torch.float32, device=GLOBAL_DEVICE))
-        rf_amp_2pi_cos = rf_amp_2pi * torch.cos(torch.tensor(rf_phase, dtype=torch.float32, device=GLOBAL_DEVICE))
+        rf_amp_2pi_sin = rf_amp_2pi * torch.sin(rf_phase.clone().detach())
+        rf_amp_2pi_cos = rf_amp_2pi * torch.cos(rf_phase.clone().detach())
 
         # Set omega_1 for water pool
         self.arr_a[:, :, 0, 2 * (n_p + 1)] = -rf_amp_2pi_sin
@@ -220,8 +222,8 @@ class BlochMcConnellSolver:
         :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
         """
         n_iter = 6  # number of iterations
-        arr_a = self.arr_a.to(dtype=torch.float32)
-        arr_c = self.arr_c.to(dtype=torch.float32)
+        arr_a = self.arr_a#.to(dtype=torch.float64)
+        arr_c = self.arr_c#.to(dtype=torch.float64)
 
         # Compute `a_inv_t` for all Isochromaten
         a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c) # Shape: [n_isochromats, n_offsets, size, 1]
@@ -239,7 +241,7 @@ class BlochMcConnellSolver:
         a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
 
         # Initialize Padé approximation
-        identity = torch.eye(arr_a.shape[-1], dtype=torch.float32, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
+        identity = torch.eye(arr_a.shape[-1], dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
         identity = identity.expand_as(arr_a)
         x = a_t.clone()
         c = 0.5
@@ -265,7 +267,7 @@ class BlochMcConnellSolver:
 
         # Compute the final magnetization
         mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
-        return mag.to(dtype=torch.float32)
+        return mag#.to(dtype=torch.float64)
 
 
     def solve_equation_expm(self, mag: np.ndarray, dtp: float) -> np.ndarray:
