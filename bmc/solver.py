@@ -219,57 +219,149 @@ class BlochMcConnellSolver:
         # Set the new arr_a
         self.arr_a = new_arr_a
 
+    # def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
+    #     """
+    #     Solves one step of BMC equations for multiple Isochromats using the Padé approximation.
+    #     :param mag: magnetization vector before current step (shape: [n_isochromats, size, 1])
+    #     :param dtp: duration of current step
+    #     :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
+    #     """
+    #     n_iter = 6  # number of iterations
+    #     arr_a = self.arr_a.to(dtype=torch.float64)
+    #     arr_c = self.arr_c.to(dtype=torch.float64)
+
+    #     # Compute a_inv_t
+    #     a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c)  # Shape: [n_isochromats, n_offsets, size, 1]
+
+    #     # Compute a_t
+    #     a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
+
+    #     # Normalize a_t to avoid numerical instability
+    #     max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3))
+    #     _, exp_shift = torch.frexp(max_norm)
+    #     exp_shift = torch.clamp(exp_shift, min=0)
+    #     a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
+
+    #     # Initialize Padé approximation
+    #     identity = torch.eye(arr_a.shape[-1], dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
+    #     identity = identity.expand_as(arr_a)
+    #     x = a_t.clone()
+    #     c = 0.5
+    #     n = identity + c * a_t
+    #     d = identity - c * a_t
+
+    #     p = True
+    #     for k in range(2, n_iter + 1):
+    #         c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
+    #         x = torch.matmul(a_t, x)
+    #         c_x = c * x
+    #         n = n + c_x
+    #         if p:
+    #             d = d + c_x
+    #         else:
+    #             d = d - c_x
+    #         p = not p
+
+    #     # Solve for matrix exponential
+    #     f = torch.matmul(torch.linalg.pinv(d), n)
+    #     for _ in range(int(exp_shift.max())):
+    #         f = torch.matmul(f, f)
+
+    #     # Compute the final magnetization
+    #     mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
+    #     return mag.to(dtype=torch.float64)
+
     def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
         """
-        Solves one step of BMC equations for multiple Isochromats using the Padé approximation.
-        :param mag: magnetization vector before current step (shape: [n_isochromats, size, 1])
-        :param dtp: duration of current step
-        :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
+        Variante des Solvers mit Mixed Precision (float32) + optionaler Verfeinerung in float64.
         """
-        n_iter = 6  # number of iterations
-        arr_a = self.arr_a.to(dtype=torch.float64)
-        arr_c = self.arr_c.to(dtype=torch.float64)
+        n_iter = 6
 
-        # Compute a_inv_t
-        a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c)  # Shape: [n_isochromats, n_offsets, size, 1]
+        # 1) Input in float32
+        arr_a_32 = self.arr_a.to(dtype=torch.float32)
+        arr_c_32 = self.arr_c.to(dtype=torch.float32)
+        mag_32   = mag.to(dtype=torch.float32)
 
-        # Compute a_t
-        a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
+        # Optional: Kritische Inversion in float64
+        #    => Hier machen wir 'arr_a_64 -> pinv -> a_inv_t_64 -> back to float32'
+        arr_a_64  = arr_a_32.to(dtype=torch.float64)
+        arr_c_64  = arr_c_32.to(dtype=torch.float64)
+        a_inv_t_64 = torch.matmul(torch.linalg.pinv(arr_a_64), arr_c_64)  # shape: [n_iso, n_off, size, 1]
+        a_inv_t_32 = a_inv_t_64.to(dtype=torch.float32)
 
-        # Normalize a_t to avoid numerical instability
-        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3))
-        _, exp_shift = torch.frexp(max_norm)
-        exp_shift = torch.clamp(exp_shift, min=0)
-        a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
+        # 2) A * dt -> a_t
+        a_t_32 = arr_a_32 * dtp
 
-        # Initialize Padé approximation
-        identity = torch.eye(arr_a.shape[-1], dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
-        identity = identity.expand_as(arr_a)
-        x = a_t.clone()
-        c = 0.5
-        n = identity + c * a_t
-        d = identity - c * a_t
+        # 3) Scaling: wie in deinem Code
+        max_norm_32 = torch.linalg.norm(a_t_32, ord=float('inf'), dim=(2, 3))
+        _, exp_shift_32 = torch.frexp(max_norm_32)
+        exp_shift_32 = torch.clamp(exp_shift_32, min=0)
+        a_t_32 = a_t_32 / (2.0 ** exp_shift_32.view(-1, 1, 1, 1))
+
+        # 4) Pade-Approx
+        size = arr_a_32.shape[-1]
+        identity_32 = torch.eye(size, dtype=torch.float32, device=arr_a_32.device)
+        identity_32 = identity_32.unsqueeze(0).unsqueeze(0).expand_as(arr_a_32)
+
+        x_32 = a_t_32.clone()
+        c_32 = torch.tensor(0.5, dtype=torch.float32, device=arr_a_32.device)
+        n_32 = identity_32 + c_32 * a_t_32
+        d_32 = identity_32 - c_32 * a_t_32
 
         p = True
         for k in range(2, n_iter + 1):
-            c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-            x = torch.matmul(a_t, x)
-            c_x = c * x
-            n = n + c_x
+            c_32 = c_32 * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
+            x_32 = torch.matmul(a_t_32, x_32)
+            c_x_32 = c_32 * x_32
+            n_32 = n_32 + c_x_32
             if p:
-                d = d + c_x
+                d_32 = d_32 + c_x_32
             else:
-                d = d - c_x
+                d_32 = d_32 - c_x_32
             p = not p
 
-        # Solve for matrix exponential
-        f = torch.matmul(torch.linalg.pinv(d), n)
-        for _ in range(int(exp_shift.max())):
-            f = torch.matmul(f, f)
+        # 5) F = D^-1 * N (Inversion in float32, optional Verfeinerung in float64)
+        #    => again, you could do float64 pinv if you want
+        f_32 = torch.matmul(torch.linalg.pinv(d_32), n_32)
 
-        # Compute the final magnetization
-        mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
-        return mag.to(dtype=torch.float64)
+        # 6) Exponent-Shifts ausführen
+        max_shift = int(exp_shift_32.max().item())
+        for _ in range(max_shift):
+            f_32 = torch.matmul(f_32, f_32)
+
+        # 7) Vorläufiges Ergebnis in float32
+        #    mag + a_inv_t in float32, dann matrix-mult in float32
+        tmp_32 = mag_32 + a_inv_t_32
+        mag_approx_32 = torch.matmul(f_32, tmp_32) - a_inv_t_32
+
+        # ===========================================
+        # 8) OPTIONAL: Iterative Verfeinerung
+        #    => Wir berechnen Residuum (z.B. in float64) und korrigieren
+        # ===========================================
+        do_refinement = True
+        if do_refinement:
+            with torch.no_grad():
+                # Cast alles nötige in float64
+                f_64    = f_32.to(dtype=torch.float64)
+                mag_in_64  = mag.to(dtype=torch.float64)
+                a_inv_t_64 = a_inv_t_32.to(dtype=torch.float64)
+
+                mag_approx_64 = mag_approx_32.to(dtype=torch.float64)
+
+                # Residuum: r = exp(A dt)*(mag_in + a_inv_t) - a_inv_t - mag_approx
+                #   => r = f_64 @ (mag_in_64 + a_inv_t_64) - a_inv_t_64 - mag_approx_64
+                rhs_64 = torch.matmul(f_64, mag_in_64 + a_inv_t_64) - a_inv_t_64
+                r_64 = rhs_64 - mag_approx_64
+
+                # Minimale Korrektur: mag_approx_64 += r_64
+                #  (Man könnte hier theoretisch noch ein lineares Glssystem lösen,
+                #   aber oft reicht Addieren bereits, wenn f_64 * ... "genau" war.)
+                mag_approx_64 = mag_approx_64 + r_64
+
+            mag_approx_32 = mag_approx_64.to(dtype=torch.float32)
+
+        # Rückgabe
+        return mag_approx_32
 
     def solve_equation_expm(self, mag: np.ndarray, dtp: float) -> np.ndarray:
         """

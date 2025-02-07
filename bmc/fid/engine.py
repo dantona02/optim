@@ -77,26 +77,121 @@ class BMCSim(BMCTool):
         """
 
         # ADC
+        # if block.adc is not None:
+        #     # 1) Kopien für alle Objekte anlegen, die wir später verändern,
+        #     #    um keine In-Place-Operationen auf PyTorch-Tensoren zu verursachen.
+        #     new_events = self.events.copy()
+        #     new_m_out = self.m_out.clone()
+        #     new_t = self.t.clone()
+        #     new_accum_phase = accum_phase
+        #     new_current_adc = current_adc
+
+        #     # 2) Initiale Schritte ausführen (Events eintragen, Zeitschritte anhängen etc.)
+        #     start_time = new_t[-1]
+        #     new_events.append(f'adc at {start_time.item():.4f}s')
+
+        #     time_array = start_time + torch.arange(
+        #         1,
+        #         self.params.options["max_pulse_samples"] + 1,
+        #         dtype=torch.float64,
+        #         device=GLOBAL_DEVICE
+        #     ) * self.dt_adc
+
+        #     # Achtung: torch.cat ist nicht in-place, da wir `new_t` neu zuweisen.
+        #     new_t = torch.cat((new_t, time_array))
+
+        #     # 3) Innerer Schleifendurchlauf ohne in-place Zuweisung.
+        #     for _ in range(len(time_array)):
+        #         # RF-/Gradienten-/ADC-Update:
+        #         self.bm_solver.update_matrix(0, 0, 0)  # kein RF amplitude, phase oder frequency
+        #         mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
+
+        #         # Anstelle von: self.m_out[:, :, current_adc] = mag.squeeze()
+        #         # bauen wir uns ein Index- und ein Quell-Array für scatter()
+
+        #         index_for_scatter = torch.full(
+        #             (new_m_out.size(0), new_m_out.size(1), 1),
+        #             new_current_adc,
+        #             dtype=torch.long,
+        #             device=GLOBAL_DEVICE
+        #         )
+        #         src_for_scatter = mag.squeeze().unsqueeze(-1)  # shape [x, y, 1]
+
+        #         # scatter(...) erzeugt einen neuen Tensor anstelle einer in-place-Zuweisung:
+        #         new_m_out = new_m_out.scatter(
+        #             dim=2,
+        #             index=index_for_scatter,
+        #             src=src_for_scatter
+        #         )
+
+        #         # Phase zurücksetzen (nur ein Python-Integer/Float)
+        #         new_accum_phase = 0
+        #         # ADC-Zähler erhöhen (nur Python-Variable)
+        #         new_current_adc += 1
+
+        #     # 4) Zum Schluss alle veränderten Variablen zurückschreiben
+        #     self.events = new_events
+        #     self.m_out = new_m_out
+        #     self.t = new_t
+        #     accum_phase = new_accum_phase
+        #     current_adc = new_current_adc
+        
         if block.adc is not None:
-            start_time = self.t[-1]
-            self.events.append(f'adc at {start_time.item():.4f}s')
+            # 1) Kopien für alle Objekte anlegen (keine Inplace-Operationen auf PyTorch-Tensoren)
+            new_events = self.events.copy()
+            new_m_out = self.m_out.clone()
+            new_t = self.t.clone()
+            new_accum_phase = accum_phase
+            new_current_adc = current_adc
 
-            new_time_array = start_time + torch.arange(1, self.params.options["max_pulse_samples"] + 1, 
-                                                    dtype=torch.float64, device=GLOBAL_DEVICE) * self.dt_adc
-            local_t = torch.cat((self.t, new_time_array))
-            adc_outputs = []
-            
-            for _ in range(len(new_time_array)):
+            # 2) Initiale Schritte (Events eintragen, Zeit array anfügen usw.)
+            start_time = new_t[-1]
+            new_events.append(f'adc at {start_time.item():.4f}s')
+
+            time_array = start_time + torch.arange(
+                1,
+                self.params.options["max_pulse_samples"] + 1,
+                dtype=torch.float64,
+                device=GLOBAL_DEVICE
+            ) * self.dt_adc
+
+            # Achtung: torch.cat ist nicht in-place, wir überschreiben new_t
+            new_t = torch.cat((new_t, time_array))
+
+            # 3) Innerer ADC-Schleifendurchlauf ohne Inplace-Zuweisung
+            for _ in range(len(time_array)):
+                # RF-/Gradienten-/ADC-Update auf 0
                 self.bm_solver.update_matrix(0, 0, 0)
+                # Solver in float64 rechnen lassen (oder float32, Hauptsache einheitlich)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=self.dt_adc)
-                adc_outputs.append(mag.squeeze())
-                accum_phase = 0
-                current_adc += 1
+                # Falls Dein Solver in float32 rechnet, konvertiere hier auf float64:
+                mag = mag.to(new_m_out.dtype)
 
-            self.t = local_t
-            new_adc_out = torch.stack(adc_outputs, dim=2)
-            self.m_out = torch.cat((self.m_out, new_adc_out), dim=2)
-            
+                # Index-Array (int64/long) erstellen
+                index_for_scatter = torch.full(
+                    (new_m_out.size(0), new_m_out.size(1), 1),
+                    new_current_adc,
+                    dtype=torch.long,
+                    device=GLOBAL_DEVICE
+                )
+                # Quelle für scatter() (muss selber dtype wie new_m_out haben)
+                src_for_scatter = mag.squeeze().unsqueeze(-1)  # shape [x, y, 1]
+
+                # scatter(...) erzeugt einen NEUEN Tensor und ist nicht in-place
+                new_m_out = new_m_out.scatter(dim=2, index=index_for_scatter, src=src_for_scatter)
+
+                # Phase zurücksetzen (nur einfache Python-Variable)
+                new_accum_phase = 0
+                # ADC-Zähler erhöhen (ebenfalls einfache Python-Variable)
+                new_current_adc += 1
+
+            # 4) Alles zurückschreiben
+            self.events = new_events
+            self.m_out = new_m_out
+            self.t = new_t
+            accum_phase = new_accum_phase
+            current_adc = new_current_adc
+
         # RF pulse
         elif block.rf is not None:
             amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])

@@ -8,7 +8,7 @@ from typing import Union
 import numpy as np
 
 from bmc.bmc_tool import BMCTool
-from bmc.fid.sim_engine import BMCSim
+from bmc.fid.engine import BMCSim
 from bmc.set_params import load_params
 from bmc.utils.eval import plot_z, plot_sim
 
