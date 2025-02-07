@@ -10,10 +10,8 @@ from torch.amp import autocast
 
 from torch.utils.cpp_extension import load
 
-# Für maximale GPU-Auslastung
-torch.backends.cuda.matmul.allow_tf32 = False  # Deaktivieren für volle FP64-Genauigkeit
-torch.backends.cudnn.allow_tf32 = False
-# torch.backends.cuda.matmul.allow_fp64_reduced_precision_reduction = True
+# torch.backends.cuda.matmul.allow_tf32 = True
+# torch.backends.cuda.preferred_linalg_library('magma')
 
 
 
@@ -229,57 +227,57 @@ class BlochMcConnellSolver:
         # Set the new arr_a
         self.arr_a = new_arr_a
 
-    # def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
-    #     """
-    #     Solves one step of BMC equations for multiple Isochromats using the Padé approximation.
-    #     :param mag: magnetization vector before current step (shape: [n_isochromats, size, 1])
-    #     :param dtp: duration of current step
-    #     :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
-    #     """
-    #     n_iter = 6  # number of iterations
-    #     arr_a = self.arr_a.to(dtype=torch.float64)
-    #     arr_c = self.arr_c.to(dtype=torch.float64)
+    def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
+        """
+        Solves one step of BMC equations for multiple Isochromats using the Padé approximation.
+        :param mag: magnetization vector before current step (shape: [n_isochromats, size, 1])
+        :param dtp: duration of current step
+        :return: magnetization vector after current step (shape: [n_isochromats, size, 1])
+        """
+        n_iter = 6  # number of iterations
+        arr_a = self.arr_a.to(dtype=torch.float64)
+        arr_c = self.arr_c.to(dtype=torch.float64)
 
-    #     # Compute a_inv_t
-    #     a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c)  # Shape: [n_isochromats, n_offsets, size, 1]
+        # Compute a_inv_t
+        a_inv_t = torch.matmul(torch.linalg.pinv(arr_a), arr_c)  # Shape: [n_isochromats, n_offsets, size, 1]
 
-    #     # Compute a_t
-    #     a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
+        # Compute a_t
+        a_t = arr_a * dtp  # Shape: [n_isochromats, n_offsets, size, size]
 
-    #     # Normalize a_t to avoid numerical instability
-    #     max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3))
-    #     _, exp_shift = torch.frexp(max_norm)
-    #     exp_shift = torch.clamp(exp_shift, min=0)
-    #     a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
+        # Normalize a_t to avoid numerical instability
+        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2, 3))
+        _, exp_shift = torch.frexp(max_norm)
+        exp_shift = torch.clamp(exp_shift, min=0)
+        a_t = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
 
-    #     # Initialize Padé approximation
-    #     identity = torch.eye(arr_a.shape[-1], dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
-    #     identity = identity.expand_as(arr_a)
-    #     x = a_t.clone()
-    #     c = 0.5
-    #     n = identity + c * a_t
-    #     d = identity - c * a_t
+        # Initialize Padé approximation
+        identity = torch.eye(arr_a.shape[-1], dtype=torch.float64, device=GLOBAL_DEVICE).unsqueeze(0).unsqueeze(0)
+        identity = identity.expand_as(arr_a)
+        x = a_t.clone()
+        c = 0.5
+        n = identity + c * a_t
+        d = identity - c * a_t
 
-    #     p = True
-    #     for k in range(2, n_iter + 1):
-    #         c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-    #         x = torch.matmul(a_t, x)
-    #         c_x = c * x
-    #         n = n + c_x
-    #         if p:
-    #             d = d + c_x
-    #         else:
-    #             d = d - c_x
-    #         p = not p
+        p = True
+        for k in range(2, n_iter + 1):
+            c = c * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
+            x = torch.matmul(a_t, x)
+            c_x = c * x
+            n = n + c_x
+            if p:
+                d = d + c_x
+            else:
+                d = d - c_x
+            p = not p
 
-    #     # Solve for matrix exponential
-    #     f = torch.matmul(torch.linalg.pinv(d), n)
-    #     for _ in range(int(exp_shift.max())):
-    #         f = torch.matmul(f, f)
+        # Solve for matrix exponential
+        f = torch.matmul(torch.linalg.pinv(d), n)
+        for _ in range(int(exp_shift.max())):
+            f = torch.matmul(f, f)
 
-    #     # Compute the final magnetization
-    #     mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
-    #     return mag.to(dtype=torch.float64)
+        # Compute the final magnetization
+        mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
+        return mag.to(dtype=torch.float64)
 
     # def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
     #     """
@@ -372,72 +370,6 @@ class BlochMcConnellSolver:
 
     #     # Rückgabe
     #     return mag_approx_32
-
-    
-    # Batch-Optimierte Version mit Tensor Core-optimierten Operationen
-    import torch
-
-    def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
-        n_iter = 6
-        
-        def align_matrix(tensor: torch.Tensor, target_dim: int) -> torch.Tensor:
-            """Pad both dimensions to make matrix multiplication compatible"""
-            pad_rows = (target_dim - tensor.size(-2) % target_dim) % target_dim
-            pad_cols = (target_dim - tensor.size(-1) % target_dim) % target_dim
-            return torch.nn.functional.pad(tensor, (0, pad_cols, 0, pad_rows))
-        
-        # Dynamische Zielgröße basierend auf arr_a
-        original_dim = self.arr_a.size(-1)  # Ursprüngliche Größe vor Padding
-        arr_a = align_matrix(self.arr_a, original_dim).to(torch.float64)
-        arr_c = align_matrix(self.arr_c, original_dim).to(torch.float64)
-
-        # Debug-Ausgaben
-        # print(f"arr_a shape after padding: {arr_a.shape}")
-        # print(f"arr_c shape after padding: {arr_c.shape}")
-        
-        # Erweiterter Konsistenzcheck
-        assert arr_a.size(-1) == arr_c.size(-2), (
-            f"Matrix-Dimensionskonflikt: arr_a Spalten ({arr_a.size(-1)}) "
-            f"≠ arr_c Zeilen ({arr_c.size(-2)})"
-        )
-        
-        # Rest der ursprünglichen Implementierung
-        a_inv_t = torch.linalg.pinv(arr_a) @ arr_c
-        a_t = arr_a * dtp
-        
-        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2,3))
-        exp_shift = torch.clamp(max_norm.log2().ceil(), min=0)
-        a_t_scaled = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
-        
-        identity = torch.eye(a_t_scaled.size(-1), 
-                            dtype=torch.float64,
-                            device=a_t_scaled.device).expand_as(a_t_scaled)
-        
-        # Padé-Approximation mit optimierten Operationen
-        x = a_t_scaled.clone()
-        c_factor = 0.5
-        numerator = identity + c_factor * x
-        denominator = identity - c_factor * x
-        
-        for k in range(2, n_iter + 1):
-            c_factor *= (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-            x = torch.matmul(a_t_scaled, x)
-            cx = c_factor * x
-            numerator += cx
-            denominator += cx if k % 2 == 0 else -cx
-        
-        f_matrix = torch.linalg.pinv(denominator) @ numerator
-        for _ in range(int(exp_shift.max())):
-            f_matrix = torch.matmul(f_matrix, f_matrix)
-        
-        # Finale Berechnung mit Trimmen der Padding-Dimensionen
-        result = (f_matrix @ (mag + a_inv_t)) - a_inv_t
-        return result[..., :mag.size(-1)]  # Originaldimension wiederherstellen
-
-
-
-
-
 
 
 
