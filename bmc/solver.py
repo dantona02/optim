@@ -6,6 +6,16 @@ import numpy as np
 from bmc.params import Params
 import torch
 from bmc.utils.global_device import GLOBAL_DEVICE
+from torch.amp import autocast
+
+from torch.utils.cpp_extension import load
+
+# Für maximale GPU-Auslastung
+torch.backends.cuda.matmul.allow_tf32 = False  # Deaktivieren für volle FP64-Genauigkeit
+torch.backends.cudnn.allow_tf32 = False
+# torch.backends.cuda.matmul.allow_fp64_reduced_precision_reduction = True
+
+
 
 class BlochMcConnellSolver:
     """
@@ -271,97 +281,165 @@ class BlochMcConnellSolver:
     #     mag = torch.matmul(f, mag + a_inv_t) - a_inv_t
     #     return mag.to(dtype=torch.float64)
 
+    # def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
+    #     """
+    #     Variante des Solvers mit Mixed Precision (float32) + optionaler Verfeinerung in float64.
+    #     """
+    #     n_iter = 6
+
+    #     # 1) Input in float32
+    #     arr_a_32 = self.arr_a.to(dtype=torch.float32)
+    #     arr_c_32 = self.arr_c.to(dtype=torch.float32)
+    #     mag_32   = mag.to(dtype=torch.float32)
+
+    #     # Optional: Kritische Inversion in float64
+    #     #    => Hier machen wir 'arr_a_64 -> pinv -> a_inv_t_64 -> back to float32'
+    #     arr_a_64  = arr_a_32.to(dtype=torch.float64)
+    #     arr_c_64  = arr_c_32.to(dtype=torch.float64)
+    #     a_inv_t_64 = torch.matmul(torch.linalg.pinv(arr_a_64), arr_c_64)  # shape: [n_iso, n_off, size, 1]
+    #     a_inv_t_32 = a_inv_t_64.to(dtype=torch.float32)
+
+    #     # 2) A * dt -> a_t
+    #     a_t_32 = arr_a_32 * dtp
+
+    #     # 3) Scaling: wie in deinem Code
+    #     max_norm_32 = torch.linalg.norm(a_t_32, ord=float('inf'), dim=(2, 3))
+    #     _, exp_shift_32 = torch.frexp(max_norm_32)
+    #     exp_shift_32 = torch.clamp(exp_shift_32, min=0)
+    #     a_t_32 = a_t_32 / (2.0 ** exp_shift_32.view(-1, 1, 1, 1))
+
+    #     # 4) Pade-Approx
+    #     size = arr_a_32.shape[-1]
+    #     identity_32 = torch.eye(size, dtype=torch.float32, device=arr_a_32.device)
+    #     identity_32 = identity_32.unsqueeze(0).unsqueeze(0).expand_as(arr_a_32)
+
+    #     x_32 = a_t_32.clone()
+    #     c_32 = torch.tensor(0.5, dtype=torch.float32, device=arr_a_32.device)
+    #     n_32 = identity_32 + c_32 * a_t_32
+    #     d_32 = identity_32 - c_32 * a_t_32
+
+    #     p = True
+    #     for k in range(2, n_iter + 1):
+    #         c_32 = c_32 * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
+    #         x_32 = torch.matmul(a_t_32, x_32)
+    #         c_x_32 = c_32 * x_32
+    #         n_32 = n_32 + c_x_32
+    #         if p:
+    #             d_32 = d_32 + c_x_32
+    #         else:
+    #             d_32 = d_32 - c_x_32
+    #         p = not p
+
+    #     # 5) F = D^-1 * N (Inversion in float32, optional Verfeinerung in float64)
+    #     #    => again, you could do float64 pinv if you want
+    #     f_32 = torch.matmul(torch.linalg.pinv(d_32), n_32)
+
+    #     # 6) Exponent-Shifts ausführen
+    #     max_shift = int(exp_shift_32.max().item())
+    #     for _ in range(max_shift):
+    #         f_32 = torch.matmul(f_32, f_32)
+
+    #     # 7) Vorläufiges Ergebnis in float32
+    #     #    mag + a_inv_t in float32, dann matrix-mult in float32
+    #     tmp_32 = mag_32 + a_inv_t_32
+    #     mag_approx_32 = torch.matmul(f_32, tmp_32) - a_inv_t_32
+
+    #     # ===========================================
+    #     # 8) OPTIONAL: Iterative Verfeinerung
+    #     #    => Wir berechnen Residuum (z.B. in float64) und korrigieren
+    #     # ===========================================
+    #     do_refinement = True
+    #     if do_refinement:
+    #         with torch.no_grad():
+    #             # Cast alles nötige in float64
+    #             f_64    = f_32.to(dtype=torch.float64)
+    #             mag_in_64  = mag.to(dtype=torch.float64)
+    #             a_inv_t_64 = a_inv_t_32.to(dtype=torch.float64)
+
+    #             mag_approx_64 = mag_approx_32.to(dtype=torch.float64)
+
+    #             # Residuum: r = exp(A dt)*(mag_in + a_inv_t) - a_inv_t - mag_approx
+    #             #   => r = f_64 @ (mag_in_64 + a_inv_t_64) - a_inv_t_64 - mag_approx_64
+    #             rhs_64 = torch.matmul(f_64, mag_in_64 + a_inv_t_64) - a_inv_t_64
+    #             r_64 = rhs_64 - mag_approx_64
+
+    #             # Minimale Korrektur: mag_approx_64 += r_64
+    #             #  (Man könnte hier theoretisch noch ein lineares Glssystem lösen,
+    #             #   aber oft reicht Addieren bereits, wenn f_64 * ... "genau" war.)
+    #             mag_approx_64 = mag_approx_64 + r_64
+
+    #         mag_approx_32 = mag_approx_64.to(dtype=torch.float32)
+
+    #     # Rückgabe
+    #     return mag_approx_32
+
+    
+    # Batch-Optimierte Version mit Tensor Core-optimierten Operationen
+    import torch
+
     def solve_equation(self, mag: torch.Tensor, dtp: float) -> torch.Tensor:
-        """
-        Variante des Solvers mit Mixed Precision (float32) + optionaler Verfeinerung in float64.
-        """
         n_iter = 6
+        
+        def align_matrix(tensor: torch.Tensor, target_dim: int) -> torch.Tensor:
+            """Pad both dimensions to make matrix multiplication compatible"""
+            pad_rows = (target_dim - tensor.size(-2) % target_dim) % target_dim
+            pad_cols = (target_dim - tensor.size(-1) % target_dim) % target_dim
+            return torch.nn.functional.pad(tensor, (0, pad_cols, 0, pad_rows))
+        
+        # Dynamische Zielgröße basierend auf arr_a
+        original_dim = self.arr_a.size(-1)  # Ursprüngliche Größe vor Padding
+        arr_a = align_matrix(self.arr_a, original_dim).to(torch.float64)
+        arr_c = align_matrix(self.arr_c, original_dim).to(torch.float64)
 
-        # 1) Input in float32
-        arr_a_32 = self.arr_a.to(dtype=torch.float32)
-        arr_c_32 = self.arr_c.to(dtype=torch.float32)
-        mag_32   = mag.to(dtype=torch.float32)
-
-        # Optional: Kritische Inversion in float64
-        #    => Hier machen wir 'arr_a_64 -> pinv -> a_inv_t_64 -> back to float32'
-        arr_a_64  = arr_a_32.to(dtype=torch.float64)
-        arr_c_64  = arr_c_32.to(dtype=torch.float64)
-        a_inv_t_64 = torch.matmul(torch.linalg.pinv(arr_a_64), arr_c_64)  # shape: [n_iso, n_off, size, 1]
-        a_inv_t_32 = a_inv_t_64.to(dtype=torch.float32)
-
-        # 2) A * dt -> a_t
-        a_t_32 = arr_a_32 * dtp
-
-        # 3) Scaling: wie in deinem Code
-        max_norm_32 = torch.linalg.norm(a_t_32, ord=float('inf'), dim=(2, 3))
-        _, exp_shift_32 = torch.frexp(max_norm_32)
-        exp_shift_32 = torch.clamp(exp_shift_32, min=0)
-        a_t_32 = a_t_32 / (2.0 ** exp_shift_32.view(-1, 1, 1, 1))
-
-        # 4) Pade-Approx
-        size = arr_a_32.shape[-1]
-        identity_32 = torch.eye(size, dtype=torch.float32, device=arr_a_32.device)
-        identity_32 = identity_32.unsqueeze(0).unsqueeze(0).expand_as(arr_a_32)
-
-        x_32 = a_t_32.clone()
-        c_32 = torch.tensor(0.5, dtype=torch.float32, device=arr_a_32.device)
-        n_32 = identity_32 + c_32 * a_t_32
-        d_32 = identity_32 - c_32 * a_t_32
-
-        p = True
+        # Debug-Ausgaben
+        # print(f"arr_a shape after padding: {arr_a.shape}")
+        # print(f"arr_c shape after padding: {arr_c.shape}")
+        
+        # Erweiterter Konsistenzcheck
+        assert arr_a.size(-1) == arr_c.size(-2), (
+            f"Matrix-Dimensionskonflikt: arr_a Spalten ({arr_a.size(-1)}) "
+            f"≠ arr_c Zeilen ({arr_c.size(-2)})"
+        )
+        
+        # Rest der ursprünglichen Implementierung
+        a_inv_t = torch.linalg.pinv(arr_a) @ arr_c
+        a_t = arr_a * dtp
+        
+        max_norm = torch.linalg.norm(a_t, ord=float('inf'), dim=(2,3))
+        exp_shift = torch.clamp(max_norm.log2().ceil(), min=0)
+        a_t_scaled = a_t / (2.0 ** exp_shift.view(-1, 1, 1, 1))
+        
+        identity = torch.eye(a_t_scaled.size(-1), 
+                            dtype=torch.float64,
+                            device=a_t_scaled.device).expand_as(a_t_scaled)
+        
+        # Padé-Approximation mit optimierten Operationen
+        x = a_t_scaled.clone()
+        c_factor = 0.5
+        numerator = identity + c_factor * x
+        denominator = identity - c_factor * x
+        
         for k in range(2, n_iter + 1):
-            c_32 = c_32 * (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
-            x_32 = torch.matmul(a_t_32, x_32)
-            c_x_32 = c_32 * x_32
-            n_32 = n_32 + c_x_32
-            if p:
-                d_32 = d_32 + c_x_32
-            else:
-                d_32 = d_32 - c_x_32
-            p = not p
+            c_factor *= (n_iter - k + 1) / (k * (2 * n_iter - k + 1))
+            x = torch.matmul(a_t_scaled, x)
+            cx = c_factor * x
+            numerator += cx
+            denominator += cx if k % 2 == 0 else -cx
+        
+        f_matrix = torch.linalg.pinv(denominator) @ numerator
+        for _ in range(int(exp_shift.max())):
+            f_matrix = torch.matmul(f_matrix, f_matrix)
+        
+        # Finale Berechnung mit Trimmen der Padding-Dimensionen
+        result = (f_matrix @ (mag + a_inv_t)) - a_inv_t
+        return result[..., :mag.size(-1)]  # Originaldimension wiederherstellen
 
-        # 5) F = D^-1 * N (Inversion in float32, optional Verfeinerung in float64)
-        #    => again, you could do float64 pinv if you want
-        f_32 = torch.matmul(torch.linalg.pinv(d_32), n_32)
 
-        # 6) Exponent-Shifts ausführen
-        max_shift = int(exp_shift_32.max().item())
-        for _ in range(max_shift):
-            f_32 = torch.matmul(f_32, f_32)
 
-        # 7) Vorläufiges Ergebnis in float32
-        #    mag + a_inv_t in float32, dann matrix-mult in float32
-        tmp_32 = mag_32 + a_inv_t_32
-        mag_approx_32 = torch.matmul(f_32, tmp_32) - a_inv_t_32
 
-        # ===========================================
-        # 8) OPTIONAL: Iterative Verfeinerung
-        #    => Wir berechnen Residuum (z.B. in float64) und korrigieren
-        # ===========================================
-        do_refinement = True
-        if do_refinement:
-            with torch.no_grad():
-                # Cast alles nötige in float64
-                f_64    = f_32.to(dtype=torch.float64)
-                mag_in_64  = mag.to(dtype=torch.float64)
-                a_inv_t_64 = a_inv_t_32.to(dtype=torch.float64)
 
-                mag_approx_64 = mag_approx_32.to(dtype=torch.float64)
 
-                # Residuum: r = exp(A dt)*(mag_in + a_inv_t) - a_inv_t - mag_approx
-                #   => r = f_64 @ (mag_in_64 + a_inv_t_64) - a_inv_t_64 - mag_approx_64
-                rhs_64 = torch.matmul(f_64, mag_in_64 + a_inv_t_64) - a_inv_t_64
-                r_64 = rhs_64 - mag_approx_64
 
-                # Minimale Korrektur: mag_approx_64 += r_64
-                #  (Man könnte hier theoretisch noch ein lineares Glssystem lösen,
-                #   aber oft reicht Addieren bereits, wenn f_64 * ... "genau" war.)
-                mag_approx_64 = mag_approx_64 + r_64
-
-            mag_approx_32 = mag_approx_64.to(dtype=torch.float32)
-
-        # Rückgabe
-        return mag_approx_32
 
     def solve_equation_expm(self, mag: np.ndarray, dtp: float) -> np.ndarray:
         """

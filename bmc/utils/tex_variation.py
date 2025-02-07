@@ -1,239 +1,215 @@
 import re
 import torch
 import torch.multiprocessing as mp
+import matplotlib.pyplot as plt
+from typing import List, Tuple, Optional
+
+# Annahme: Diese Funktion muss für PyTorch angepasst werden
 from bmc.simulate import simulate
 
-def _run_variation(seq_path_on: str,
-                   seq_path_off: str,
-                   config_path: str,
-                   adc_time: float,
-                   z_pos: torch.Tensor,
-                   webhook: bool):
+def _run_variation(seq_path_on: str, seq_path_off: str, config_path: str, adc_time: float, 
+                   z_pos: torch.Tensor, webhook: str, show_plot: bool) -> Tuple[Optional[int], Optional[float]]:
     try:
-        signal = 0
         t_ex = 0
         match = re.search(r'\d+', seq_path_on)
         if match:
             t_ex = int(match.group())
 
-        simOn = simulate(config_file=config_path, 
-                         seq_file=seq_path_on, 
-                         adc_time=adc_time,
-                         z_positions=z_pos,
-                         return_zmag=False,
-                         iso_select=[0],
-                         show_plot=False,
-                         write_all_mag=True,
-                         webhook=webhook,
-                         plt_range=None)
-
-        simOff = simulate(config_file=config_path, 
-                          seq_file=seq_path_off, 
-                          adc_time=adc_time,
-                          z_positions=z_pos,
-                          return_zmag=False,
-                          iso_select=[0],
-                          show_plot=False,
-                          write_all_mag=True,
-                          webhook=webhook,
-                          plt_range=None)
-
-        _, _, _, _, m_complex_on = simOn.get_mag(return_cest_pool=False)
-        _, _, _, _, m_complex_off = simOff.get_mag(return_cest_pool=False)
-
-        assert len(m_complex_on) >= 600 and len(m_complex_off) >= 600, \
-            f"Arrays sind zu klein: m_complex_on={len(m_complex_on)}, m_complex_off={len(m_complex_off)}"
-
+        # Annahme: simulate() gibt jetzt PyTorch Tensoren zurück
+        sim_on = simulate(
+            config_file=config_path,
+            seq_file=seq_path_on,
+            adc_time=adc_time,
+            z_positions=z_pos,
+            return_zmag=False,
+            iso_select=[0],
+            show_plot=False,
+            n_backlog=2,
+            webhook=webhook,
+            plt_range=None
+        )
+        t, _, _, _, m_complex_on = sim_on.get_mag(return_cest_pool=False)
         m_on = torch.abs(m_complex_on[-600:])
-        m_off = torch.abs(m_complex_off[-600:])
         
+        del m_complex_on, sim_on
+        torch.cuda.empty_cache()
+
+        sim_off = simulate(
+            config_file=config_path,
+            seq_file=seq_path_off,
+            adc_time=adc_time,
+            z_positions=z_pos,
+            return_zmag=False,
+            iso_select=[0],
+            show_plot=False,
+            n_backlog=2,
+            webhook=webhook,
+            plt_range=None
+        )
+        _, _, _, _, m_complex_off = sim_off.get_mag(return_cest_pool=False)
+        m_off = torch.abs(m_complex_off[-600:])
+
+        del m_complex_off, sim_off
+        torch.cuda.empty_cache()
+
+        if m_on.shape[0] != 600 or m_off.shape[0] != 600:
+            raise ValueError(f"Arrays too small: m_on={m_on.shape[0]}, m_off={m_off.shape[0]}")
+
         signal_corrected = m_on - m_off
         signal = torch.max(signal_corrected).item()
+
+        if show_plot:
+            plt.plot(t[-600:].cpu().numpy(), signal_corrected.cpu().numpy(), 'o', c='blue', markersize=1)
+            plt.axhline(0, c='black')
+            plt.show()
+
+        del m_on, m_off, signal_corrected, t
+        torch.cuda.empty_cache()
+
         return t_ex, signal
+
     except Exception as e:
-        print(f"Fehler bei der Verarbeitung: {e}")
+        print(f"Error during processing: {e}")
         return None, None
 
-def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, num_points=2):
-    assert len(seq_path_on) == len(seq_path_off), "Eingabelisten müssen die gleiche Länge haben"
+def run_variation_helper(args):
+    return _run_variation(*args)
 
-    args_list = [(seq_path_on[i], seq_path_off[i], config_path, adc_time, z_pos, webhook) for i in range(num_points)]
+def run_variation(seq_path_on: List[str], seq_path_off: List[str], config_path: str, adc_time: float, 
+                  z_pos: torch.Tensor, webhook: str, num_points: int = 2, batch_size: int = 10, 
+                  max_processes: int = 4, save_path: str = "results.pt", save_to_file: bool = True, 
+                  show_plot: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    
+    assert len(seq_path_on) == len(seq_path_off), "Input lists must have the same length"
+    
+    num_processes = min(mp.cpu_count(), max_processes)
+    results = []
 
-    # Use PyTorch multiprocessing
-    mp.set_start_method('spawn', force=True)
-    with mp.Pool(mp.cpu_count()) as pool:
-        results = pool.starmap(_run_variation, args_list)
+    if save_to_file:
+        try:
+            results = torch.load(save_path)
+            print(f"Loaded previous results: {len(results)} entries")
+        except FileNotFoundError:
+            print("No previous results found, starting fresh.")
+    else:
+        print("Results will not be saved to a file.")
 
-    results = [res for res in results if res is not None]
+    processed_indices = set()
+    for res in results:
+        if res is not None:
+            if isinstance(res[0], str):
+                match = re.search(r'\d+', res[0])
+                if match:
+                    processed_indices.add(int(match.group()))
+            elif isinstance(res[0], (int, float)):
+                processed_indices.add(int(res[0]))
+
+    print(f"Already processed indices: {len(processed_indices)}")
+
+    for batch_start in range(0, num_points, batch_size):
+        batch_end = min(batch_start + batch_size, num_points)
+
+        args_list = []
+        for i in range(batch_start, batch_end):
+            match = re.search(r'\d+', seq_path_on[i])
+            if match:
+                t_ex = int(match.group())
+                if t_ex not in processed_indices:
+                    args_list.append((
+                        seq_path_on[i],
+                        seq_path_off[i],
+                        config_path,
+                        adc_time,
+                        z_pos,
+                        webhook,
+                        show_plot
+                    ))
+
+        if not args_list:
+            continue 
+
+        with mp.Pool(processes=num_processes) as pool:
+            for br in pool.imap(run_variation_helper, args_list, chunksize=1):
+                if br and br[0] is not None:
+                    results.append(br)
+                    processed_indices.add(br[0])
+                    if save_to_file:
+                        torch.save(results, save_path)
+                    print(f"Result processed: {br} | Total entries: {len(results)}")
+
     if not results:
-        raise ValueError("Keine gültigen Ergebnisse")
+        raise ValueError("No valid results obtained")
 
     t_ex, signal = zip(*results)
-    return torch.tensor(t_ex, dtype=torch.float32), torch.tensor(signal, dtype=torch.float32)
+    return torch.tensor(t_ex), torch.tensor(signal)
 
-# import re
-# import torch
-# import multiprocessing
-# import os
-# from bmc.simulate import simulate
+def run_sim(seq_path: str, config_path: str, adc_time: float, z_pos: torch.Tensor, 
+            webhook: str, plt_range: Optional[List[float]], get_t: bool) -> Tuple[torch.Tensor, torch.Tensor]:
+    
+    sim = simulate(
+        config_file=config_path,
+        seq_file=seq_path,
+        adc_time=adc_time,
+        z_positions=z_pos,
+        return_zmag=False,
+        iso_select=[0],
+        show_plot=False,
+        n_backlog=2,
+        webhook=webhook,
+        plt_range=plt_range
+    )
+    
+    res = sim.get_mag(return_cest_pool=False)
+    if get_t:
+        t, _, _, _, m_complex = res
+    else:
+        _, _, _, _, m_complex = res
+    m = torch.abs(m_complex[-600:])
+    return (t, m) if get_t else m
 
-# def _run_variation(seq_path_on: str,
-#                    seq_path_off: str,
-#                    config_path: str,
-#                    adc_time: float,
-#                    z_pos: torch.Tensor,
-#                    webhook: bool):
-#     try:
-#         signal = 0
-#         t_ex = 0
+def run_variation_parallel(seq_path_on: str, seq_path_off: str, config_path: str, adc_time: float, 
+                           z_pos: torch.Tensor, webhook: str, show_plot: bool) -> Tuple[Optional[int], Optional[float]]:
+    try:
+        t_ex = 0
+        match = re.search(r'\d+', seq_path_on)
+        if match:
+            t_ex = int(match.group())
 
-#         seq_path_on = os.path.abspath(seq_path_on)
-#         seq_path_off = os.path.abspath(seq_path_off)
-#         config_path = os.path.abspath(config_path)
-
-#         match = re.search(r'\d+', seq_path_on)
-#         if match:
-#             t_ex = int(match.group())
-
-#         simOn = simulate(config_file=config_path, 
-#                          seq_file=seq_path_on, 
-#                          adc_time=adc_time,
-#                          z_positions=z_pos,
-#                          return_zmag=False,
-#                          iso_select=[0],
-#                          show_plot=False,
-#                          write_all_mag=True,
-#                          webhook=webhook,
-#                          plt_range=None)
-
-#         simOff = simulate(config_file=config_path, 
-#                           seq_file=seq_path_off, 
-#                           adc_time=adc_time,
-#                           z_positions=z_pos,
-#                           return_zmag=False,
-#                           iso_select=[0],
-#                           show_plot=False,
-#                           write_all_mag=True,
-#                           webhook=webhook,
-#                           plt_range=None)
-
-#         _, _, _, _, m_complex_on = simOn.get_mag(return_cest_pool=False)
-#         _, _, _, _, m_complex_off = simOff.get_mag(return_cest_pool=False)
-
-#         assert len(m_complex_on) >= 600 and len(m_complex_off) >= 600, \
-#             f"Arrays sind zu klein: m_complex_on={len(m_complex_on)}, m_complex_off={len(m_complex_off)}"
-
-#         m_on = torch.abs(m_complex_on[-600:])
-#         m_off = torch.abs(m_complex_off[-600:])
+        num_processes = 2
+        ctx = mp.get_context('spawn')
+        pool = ctx.Pool(processes=num_processes)
         
-#         signal_corrected = m_on - m_off
-#         signal = torch.max(signal_corrected).item()
-#         return t_ex, signal
-#     except Exception as e:
-#         print(f"Fehler bei der Verarbeitung: {e}")
-#         return None, None
+        async_on = pool.apply_async(
+            run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
+        )
+        async_off = pool.apply_async(
+            run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, False)
+        )
+        pool.close()
+        pool.join()
 
-# def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, num_points=2):
-#     assert len(seq_path_on) == len(seq_path_off), "Eingabelisten müssen die gleiche Länge haben"
+        on_result = async_on.get()
+        off_result = async_off.get()
 
+        t, m_on = on_result
+        m_off = off_result
 
-#     # Argumentliste für die Prozesse erstellen
-#     args_list = [(seq_path_on[i], seq_path_off[i], config_path, adc_time, z_pos, webhook) for i in range(num_points)]
+        if m_on.shape[0] != 600 or m_off.shape[0] != 600:
+            raise ValueError(f"Arrays too small: m_on={m_on.shape[0]}, m_off={m_off.shape[0]}")
 
-#     # Multiprocessing mit der 'spawn'-Methode
-#     multiprocessing.set_start_method('spawn', force=True)
-#     with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
-#         results = pool.starmap(_run_variation, args_list)
+        signal_corrected = m_on - m_off
+        signal = torch.max(signal_corrected).item()
 
-#     # Ergebnisse filtern
-#     results = [res for res in results if res is not None]
-#     if not results:
-#         raise ValueError("Keine gültigen Ergebnisse")
+        if show_plot:
+            plt.plot(t[-600:].cpu().numpy(), signal_corrected.cpu().numpy(), 'o', c='blue', markersize=1)
+            plt.axhline(0, c='black')
+            plt.show()
 
-#     t_ex, signal = zip(*results)
-#     return torch.tensor(t_ex, dtype=torch.float32), torch.tensor(signal, dtype=torch.float32)
+        del m_on, m_off, signal_corrected, t
+        torch.cuda.empty_cache()
 
-# import re
-# import torch
-# import torch.multiprocessing as mp
-# from bmc.simulate import simulate
+        return t_ex, signal
 
-# def _run_variation(args):
-#     """
-#     Führt eine einzelne Variation aus. Erwartet die Argumente als Tupel.
-#     """
-#     try:
-#         seq_path_on, seq_path_off, config_path, adc_time, z_pos_cpu, webhook = args
-
-#         # Z_pos auf die GPU verschieben (pro Subprozess)
-#         z_pos = z_pos_cpu.to('cuda')
-
-#         signal = 0
-#         t_ex = 0
-#         match = re.search(r'\d+', seq_path_on)
-#         if match:
-#             t_ex = int(match.group())
-
-#         simOn = simulate(config_file=config_path, 
-#                          seq_file=seq_path_on, 
-#                          adc_time=adc_time,
-#                          z_positions=z_pos,
-#                          return_zmag=False,
-#                          iso_select=[0],
-#                          show_plot=False,
-#                          write_all_mag=True,
-#                          webhook=webhook,
-#                          plt_range=None)
-
-#         simOff = simulate(config_file=config_path, 
-#                           seq_file=seq_path_off, 
-#                           adc_time=adc_time,
-#                           z_positions=z_pos,
-#                           return_zmag=False,
-#                           iso_select=[0],
-#                           show_plot=False,
-#                           write_all_mag=True,
-#                           webhook=webhook,
-#                           plt_range=None)
-
-#         _, _, _, _, m_complex_on = simOn.get_mag(return_cest_pool=False)
-#         _, _, _, _, m_complex_off = simOff.get_mag(return_cest_pool=False)
-
-#         assert len(m_complex_on) >= 600 and len(m_complex_off) >= 600, \
-#             f"Arrays sind zu klein: m_complex_on={len(m_complex_on)}, m_complex_off={len(m_complex_off)}"
-
-#         m_on = torch.abs(torch.tensor(m_complex_on[-600:], dtype=torch.cfloat, device='cuda'))
-#         m_off = torch.abs(torch.tensor(m_complex_off[-600:], dtype=torch.cfloat, device='cuda'))
-#         signal_corrected = m_on - m_off
-#         signal = torch.max(signal_corrected).item()
-
-#         return t_ex, signal
-#     except Exception as e:
-#         print(f"Fehler bei der Verarbeitung: {e}")
-#         return None, None
-
-# def run_variation(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, num_points=2):
-#     """
-#     Führt Variationen parallel aus.
-#     """
-#     assert len(seq_path_on) == len(seq_path_off), "Eingabelisten müssen die gleiche Länge haben"
-
-#     # Argumentliste vorbereiten
-#     z_pos_cpu = z_pos.to('cpu')  # z_pos vorab auf CPU verschieben
-#     args_list = [(seq_path_on[i], seq_path_off[i], config_path, adc_time, z_pos_cpu, webhook) for i in range(num_points)]
-
-#     # Multiprocessing mit 'spawn'-Methode
-#     mp.set_start_method('spawn', force=True)
-
-#     # Ergebnisse mit Pool parallel verarbeiten
-#     results = []
-#     with mp.Pool(processes=mp.cpu_count()) as pool:
-#         for result in pool.imap_unordered(_run_variation, args_list):
-#             if result is not None:
-#                 results.append(result)
-
-#     if not results:
-#         raise ValueError("Keine gültigen Ergebnisse")
-
-#     t_ex, signal = zip(*results)
-#     return torch.tensor(t_ex, dtype=torch.float32).to('cuda'), torch.tensor(signal, dtype=torch.float32).to('cuda')
+    except Exception as e:
+        print(f"Error during processing: {e}")
+        return None, None

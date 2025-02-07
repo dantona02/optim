@@ -18,6 +18,8 @@ from manim.opengl import *
 
 from bmc.utils.webhook import DiscordNotifier
 
+# torch.backends.cuda.preferred_linalg_library('magma')
+
 class BMCSim(BMCTool):
     def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, n_backlog: str | int, verbose: bool = True, webhook: bool = False, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
@@ -48,6 +50,8 @@ class BMCSim(BMCTool):
         self.events = []
 
         self.webhook = webhook
+
+        self.graph = torch.cuda.CUDAGraph()
 
 
     def run_adc(self, block, current_adc, accum_phase, mag, counter) -> Tuple[int, float, torch.Tensor]:
@@ -201,6 +205,7 @@ class BMCSim(BMCTool):
                 self.events.append(f'rf at {start_time.item():.4f}s')
                 time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.t = torch.cat((self.t, time_array))
+            
             for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
