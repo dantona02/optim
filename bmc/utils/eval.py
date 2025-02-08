@@ -3,12 +3,13 @@ eval.py
     Functions for evaluation and visualization.
 """
 from typing import Tuple, Union
-
+import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib import colors as mcolors
 from manim import color_gradient, PURE_BLUE, PURE_GREEN, PURE_RED
+from bmc.optimize.optimizer import BMCSim
 
 
 def calc_mtr_asym(m_z: np.ndarray, offsets: np.ndarray, n_interp: int = 1000) -> np.ndarray:
@@ -304,3 +305,26 @@ def plot_sim(
     plt.show()
 
     return fig
+
+
+
+def calculate_flip_angle(rf_amplitudes_hz: torch.Tensor, dt: float, sim_instance: BMCSim) -> float:
+    """
+    Calculate the flip angle of a given RF pulse tensor
+
+    Args:
+        rf_amplitudes_hz (torch.Tensor): RF amplitudes in Hz
+        dt (float): Time step of puls fragment in seconds
+
+    Returns:
+        float: Flip angle in degrees
+    """
+
+    flip_angle_rad = torch.sum(rf_amplitudes_hz) * dt *  (2 * torch.pi)# dt in Sekunden
+    flip_angle_deg = torch.rad2deg(flip_angle_rad).item()
+
+    flip_angle_deg = flip_angle_deg % 360
+    if flip_angle_deg > 180:
+        flip_angle_deg = 360 - flip_angle_deg
+
+    return flip_angle_deg

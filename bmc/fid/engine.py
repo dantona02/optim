@@ -51,8 +51,6 @@ class BMCSim(BMCTool):
 
         self.webhook = webhook
 
-        self.graph = torch.cuda.CUDAGraph()
-
 
     def run_adc(self, block, current_adc, accum_phase, mag, counter) -> Tuple[int, float, torch.Tensor]:
         """
