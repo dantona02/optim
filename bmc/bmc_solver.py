@@ -130,11 +130,11 @@ class BlochMcConnellSolver:
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
         # np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
-        # self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
+        self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * np.linspace(params.scanner["b0_inhomogeneity"], -params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * np.random.uniform(-params.scanner["b0_inhomogeneity"], params.scanner["b0_inhomogeneity"], self.n_isochromats)
-        self.dw0 = self.w0 * self.generate_gaussian_random_field_ppm(1, params.scanner["b0_inhomogeneity"], 40)
+        # self.dw0 = self.w0 * self.generate_gaussian_random_field_ppm(1, params.scanner["b0_inhomogeneity"], 40)
         self._init_matrix_a()
         self._init_vector_c()
 
