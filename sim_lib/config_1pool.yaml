@@ -62,7 +62,7 @@ cest_pool: {
 
 b0: 17
 gamma: 267.5153
-b0_inhom: 0.0
+b0_inhom: 0.2
 rel_b1: 1
 
 ##### Additional simulation settings

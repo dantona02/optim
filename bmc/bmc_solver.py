@@ -128,13 +128,27 @@ class BlochMcConnellSolver:
         """
         self.params = params
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
-        # np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
+        np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
+
         self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
+        # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
+
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * np.linspace(params.scanner["b0_inhomogeneity"], -params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * np.random.uniform(-params.scanner["b0_inhomogeneity"], params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * self.generate_gaussian_random_field_ppm(1, params.scanner["b0_inhomogeneity"], 40)
+
+        # sigma = params.scanner["b0_inhomogeneity"]
+        # O1 = 0
+        # v = np.linspace(-0.1, .1, self.n_isochromats)
+        # ln2 = np.log(2)
+        # f_v = (2 / sigma) * np.sqrt(ln2 / np.pi) * np.exp(-4 * ln2 * ((v - O1)**2) / sigma**2)
+        # f_v /= np.trapz(f_v, v)
+        # num_samples = self.n_isochromats 
+        # self.dw0 = self.w0 *  np.random.choice(v, size=num_samples, p=f_v / f_v.sum())
+
+     
         self._init_matrix_a()
         self._init_vector_c()
 
@@ -189,6 +203,7 @@ class BlochMcConnellSolver:
         # set off-resonance terms for cest pools
         for i in range(1, n_p + 1):
             dwi = self.params.cest_pools[i - 1]["dw"] * self.w0 - (rf_freq_2pi + self.dw0)
+            # dwi = self.params.cest_pools[i - 1]["dw"] * (self.w0 - self.dw0) - rf_freq_2pi
             self.arr_a[:, :, i, i + n_p + 1] = -dwi[:, np.newaxis]
             self.arr_a[:, :, i + n_p + 1, i] = dwi[:, np.newaxis]
 
