@@ -69,8 +69,21 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
         amp_ = amp[::sample_factor]
         ph_ = ph[::sample_factor]
         dtp_ = dtp * sample_factor
-    else:
-        raise Exception("Case with 1 < unique samples < max_pulse_samples not implemented yet. Sorry :(")
+    elif 1 < n_unique < max_pulse_samples:
+        # Interpolate to exactly `max_pulse_samples`
+        x_original = np.linspace(0, amp.size - 1, amp.size)
+        x_resampled = np.linspace(0, amp.size - 1, max_pulse_samples)
+        x_original = np.ravel(x_original)
+        x_resampled = np.ravel(x_resampled)
+        amp = np.ravel(amp)
+        ph = np.ravel(ph)
+        amp_ = np.interp(x_resampled, x_original, amp)
+        # Für die Phase: zuerst unwrappen, interpolieren und dann wieder in den Bereich [-pi, pi] bringen
+        ph_unwrapped = np.unwrap(ph)
+        ph_interp = np.interp(x_resampled, x_original, ph_unwrapped)
+        ph_ = (ph_interp + np.pi) % (2 * np.pi) - np.pi
+        dtp_ = dtp * (amp.size / max_pulse_samples)
+    
 
     return amp_, ph_, dtp_, delay_after_pulse
 
