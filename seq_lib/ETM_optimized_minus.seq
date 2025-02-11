@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 11-Feb-2025 17:59:33
+# Created at: 11-Feb-2025 17:59:41
 
 [VERSION]
 major 1
@@ -17,14 +17,14 @@ B0 17
 BlockDurationRaster 1e-05 
 FREQ 723.7988 
 GradientRasterTime 1e-05 
-M0_offset 100 
+M0_offset -100 
 RadiofrequencyRasterTime 1e-06 
 TotalDuration 0.0875 
 a 90 
 n_ETM 1 
 num_meas 1 
-offsets_ppm 100 
-seq_id_string ETM_optimized 
+offsets_ppm -100 
+seq_id_string ETM_optimized_minus 
 
 # Format of blocks:
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
@@ -1126,4 +1126,4 @@ num_samples 286
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 91b27cc8ccc8d0f313953b6a16fc2914
+Hash 1841f8bff510a0adc94c09906c415066
