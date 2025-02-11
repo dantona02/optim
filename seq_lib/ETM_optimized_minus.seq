@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 11-Feb-2025 18:16:34
+# Created at: 11-Feb-2025 18:20:42
 
 [VERSION]
 major 1
@@ -19,7 +19,7 @@ FREQ 723.7988
 GradientRasterTime 1e-05 
 M0_offset -100 
 RadiofrequencyRasterTime 1e-06 
-TotalDuration 0.0875 
+TotalDuration 0.088 
 a 90 
 n_ETM 1 
 num_meas 1 
@@ -32,9 +32,10 @@ seq_id_string ETM_optimized_minus
 1 200   1   0   0   0  0  0
 2  50   0   0   0   1  0  0
 3 200   2   0   0   0  0  0
-4 8000   0   0   0   0  0  0
+4 8000   0   0   0   2  0  0
 5 200   3   0   0   0  0  0
-6 100   0   0   0   0  1  0
+6  50   0   0   0   1  0  0
+7 100   0   0   0   0  1  0
 
 # Format of RF events:
 # id amplitude mag_id phase_id time_shape_id delay freq phase
@@ -42,7 +43,7 @@ seq_id_string ETM_optimized_minus
 [RF]
 1      504.252 1 2 3 0 -72379.9 0
 2      504.659 6 7 3 0 -72379.9 0
-3      497.933 8 9 3 0 0 0
+3      497.933 10 11 3 0 0 0
 
 # Format of arbitrary gradients:
 #   time_shape_id of 0 means default timing (stepping with grad_raster starting at 1/2 of grad_raster)
@@ -50,6 +51,7 @@ seq_id_string ETM_optimized_minus
 # ..      Hz/m       ..         ..          us
 [GRADIENTS]
 1  5.56899e+07 4 5 0
+2  5.05808e+08 8 9 0
 
 # Format of ADC events:
 # id num dwell delay freq phase
@@ -826,6 +828,84 @@ num_samples 286
 52
 
 shape_id 8
+num_samples 80000
+0
+0.02
+0.02
+48
+0
+0
+79898
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+
+shape_id 9
+num_samples 80000
+0.05
+0.1
+0.1
+79997
+
+shape_id 10
 num_samples 286
 0.00100807842
 0.00100872733
@@ -1114,7 +1194,7 @@ num_samples 286
 0.000999640173
 0.00099894091
 
-shape_id 9
+shape_id 11
 num_samples 286
 0
 0
@@ -1126,4 +1206,4 @@ num_samples 286
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 7efcba8f98fb1aea8ddcf9a7d1933413
+Hash 8537bb4d4075a47e225a00469661b26d
