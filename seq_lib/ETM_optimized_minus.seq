@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 11-Feb-2025 17:59:41
+# Created at: 11-Feb-2025 18:16:34
 
 [VERSION]
 major 1
@@ -40,8 +40,8 @@ seq_id_string ETM_optimized_minus
 # id amplitude mag_id phase_id time_shape_id delay freq phase
 # ..        Hz   ....     ....          ....    us   Hz   rad
 [RF]
-1      504.252 1 2 3 0 0 0
-2      504.659 6 7 3 0 0 0
+1      504.252 1 2 3 0 -72379.9 0
+2      504.659 6 7 3 0 -72379.9 0
 3      497.933 8 9 3 0 0 0
 
 # Format of arbitrary gradients:
@@ -1126,4 +1126,4 @@ num_samples 286
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 1841f8bff510a0adc94c09906c415066
+Hash 7efcba8f98fb1aea8ddcf9a7d1933413
