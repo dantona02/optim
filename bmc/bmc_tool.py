@@ -74,8 +74,36 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
         amp_ = amp[::sample_factor]
         ph_ = ph[::sample_factor]
         dtp_ = dtp * sample_factor
+    elif 1 < n_unique < max_pulse_samples:
+        # Speichere die ursprüngliche Länge des RF-Signals
+        original_length = amp.size(0)
+        
+        # Amplitudeninterpolation mittels F.interpolate:
+        amp_reshaped = amp.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, original_length)
+        amp_interp = F.interpolate(amp_reshaped, size=max_pulse_samples, mode='linear', align_corners=True)
+        amp_ = amp_interp.squeeze(0).squeeze(0)         # Shape: (max_pulse_samples,)
+        amp_ = amp_.to(GLOBAL_DEVICE)
+        
+        # Phaseninterpolation:
+        # Konvertiere die Phase in ein NumPy-Array, um dort np.unwrap und np.interp anzuwenden.
+        ph_np = ph.detach().cpu().numpy()               # (original_length,)
+        # Erstelle die x-Achsen-Vektoren für die Original- und Zielindizes
+        x_original = np.linspace(0, original_length - 1, original_length)
+        x_resampled = np.linspace(0, original_length - 1, max_pulse_samples)
+        # Unwrappe die Phase, um Sprünge zu vermeiden
+        ph_unwrapped = np.unwrap(ph_np)
+        # Interpoliere die unwrapped Phase auf die gewünschte Anzahl von Samples
+        ph_interp = np.interp(x_resampled, x_original, ph_unwrapped)
+        # Bringe die interpolierte Phase wieder in den Bereich [-π, π]
+        ph_wrapped = (ph_interp + np.pi) % (2 * np.pi) - np.pi
+        # Konvertiere zurück in einen Torch-Tensor
+        ph_ = torch.tensor(ph_wrapped, dtype=torch.float64, device=GLOBAL_DEVICE)
+        
+        # Passe den effektiven Zeitschritt an:
+        dtp_ = dtp * (original_length / max_pulse_samples)
+        
     else:
-        raise Exception("Case with 1 < unique samples < max_pulse_samples not implemented yet. Sorry :(")
+        raise Exception("Unexpected case encountered in prep_grad_simulation.")
 
     return amp_.to(dtype=torch.float64), ph_.to(dtype=torch.float64), dtp_, delay_after_pulse
 
@@ -130,7 +158,7 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
         sample_factor = int(torch.ceil(torch.tensor(amp.size(0) / max_pulse_samples, device=GLOBAL_DEVICE)))
         amp_ = amp[::sample_factor]
         dtp_ = dtp * sample_factor
-    if 1 < n_unique < max_pulse_samples:
+    elif 1 < n_unique < max_pulse_samples:
         # Reshape amp to make it compatible with F.interpolate
         amp = amp.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, amp.size(0))
 
