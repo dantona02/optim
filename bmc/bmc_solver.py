@@ -131,7 +131,7 @@ class BlochMcConnellSolver:
         np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
 
-        self.dw0 = self.w0 * (-1 * np.sort(np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)))
+        self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
 
         # self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)

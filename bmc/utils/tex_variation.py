@@ -185,58 +185,65 @@ def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
     # get_mag liefert üblicherweise (t, _, _, _, m_complex)
     res = sim.get_mag(return_cest_pool=False)
     if get_t:
-        t, _, _, _, m_complex = res
+        _, _, _, _, m_complex = res
+        t, m_plot = sim.get_exact()
     else:
         _, _, _, _, m_complex = res
-    m = np.abs(m_complex[-600:])  # letzte 600 Werte
-    return (t, m) if get_t else m
+    m = np.abs(m_complex)
+    return (t, m, m_plot) if get_t else m
 
-def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot):
-    try:
-        # Extrahiere t_ex aus dem Dateinamen der on-Sequenz
-        t_ex = 0
-        match = re.search(r'\d+', seq_path_on)
-        if match:
-            t_ex = int(match.group())
+def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot, save_plot):
+    # Extrahiere t_ex aus dem Dateinamen der on-Sequenz
+    t_ex = 0
+    match = re.search(r'\d+', seq_path_on)
+    if match:
+        t_ex = int(match.group())
 
-        # Starte beide Simulationen parallel mittels Multiprocessing
-        num_processes = 2  # ein Prozess für "on", einer für "off"
-        pool = multiprocessing.Pool(processes=num_processes)
-        
-        async_on = pool.apply_async(
-            run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
-        )
-        async_off = pool.apply_async(
-            run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, False)
-        )
-        pool.close()
-        pool.join()
+    # Starte beide Simulationen parallel mittels Multiprocessing
+    num_processes = 2  # ein Prozess für "on", einer für "off"
+    pool = multiprocessing.Pool(processes=num_processes)
+    
+    async_on = pool.apply_async(
+        run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
+    )
+    async_off = pool.apply_async(
+        run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, True)
+    )
+    pool.close()
+    pool.join()
 
-        on_result = async_on.get()   # Gibt (t, m_on) zurück
-        off_result = async_off.get()  # Gibt m_off zurück
+    on_result = async_on.get()   # Gibt (t, m_on) zurück
+    off_result = async_off.get()  # Gibt m_off zurück
 
-        # on_result ist ein Tupel (t, m_on)
-        t, m_on = on_result
-        m_off = off_result
+    # on_result ist ein Tupel (t, m_on)
+    t, m_on, m_plot_on = on_result
+    t, m_off, m_plot_off = off_result
 
-        # Überprüfe, ob die Arrays die erwartete Größe haben
-        if len(m_on) != 600 or len(m_off) != 600:
-            raise ValueError(f"Arrays too small: m_on={len(m_on)}, m_off={len(m_off)}")
+    # Überprüfe, ob die Arrays die erwartete Größe haben
+    if len(m_on) != len(m_off):
+        raise ValueError(f"Arrays m_on and m_off do not have the same length (m_off={len(m_on)}, m_off={len(m_off)}!")
 
-        # Berechne die korrigierte Signaldifferenz und ermittle den Maximalwert
-        signal_corrected = m_on - m_off
-        signal = np.max(signal_corrected)
+    # Berechne die korrigierte Signaldifferenz und ermittle den Maximalwert
+    signal_corrected = m_on - m_off
+    signal_plot = [np.abs(m_plot_on) - np.abs(m_plot_off) for m_plot_on, m_plot_off in zip(m_plot_on, m_plot_off)]
+    signal = np.max(signal_corrected)
 
-        if show_plot:
-            plt.plot(t[-600:], signal_corrected, 'o', c='blue', markersize=1)
-            plt.axhline(0, c='black')
-            plt.show()
+    
 
-        del m_on, m_off, signal_corrected, t
-        gc.collect()
 
-        return t_ex, signal
+    if show_plot:
+        fig, ax = plt.subplots(dpi=150)
+        for index, i in enumerate(t):
+            plt.plot(i, signal_plot[index], 'o', markersize=1)
+        # plt.plot(t[0], signal_plot[0], 'o', markersize=1)
+        plt.axhline(0, c='black')
+        plt.xlim(0.00, 0.005)
+        plt.ylim(-0.0008, 0.0003)
+        plt.show()
+        if save_plot:
+            fig.savefig(f"/Users/danielmiksch/Downloads/racete_0ppm.png", dpi=300, bbox_inches='tight')
 
-    except Exception as e:
-        print(f"Error during processing: {e}")
-        return None, None
+    del m_on, m_off, signal_corrected, t
+    gc.collect()
+
+    return t_ex, signal, fig

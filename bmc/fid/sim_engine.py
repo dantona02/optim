@@ -57,6 +57,7 @@ class BMCSim(BMCTool):
         self.t = np.array([0])
         self.total_vec = None
         self.events = []
+        self.time_sampling_size = np.array([])
 
         self.webhook = webhook
 
@@ -68,6 +69,8 @@ class BMCSim(BMCTool):
             start_time = self.t[-1]
             self.events.append(f'adc at {start_time:.4f}s')
             time_array = start_time + np.arange(1, self.params.options["max_pulse_samples"] + 1) * self.dt_adc
+            self.time_sampling_size = np.append(self.time_sampling_size, len(time_array))
+
             self.t = np.append(self.t, time_array)
 
             for step in range(len(time_array)):
@@ -85,6 +88,9 @@ class BMCSim(BMCTool):
                 start_time = self.t[-1]
                 self.events.append(f'rf at {start_time:.4f}s')
                 time_array = start_time + np.arange(1, amp_.size + 1) * dtp_
+
+                self.time_sampling_size = np.append(self.time_sampling_size, len(time_array))
+
                 self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
@@ -124,6 +130,9 @@ class BMCSim(BMCTool):
                 start_time = self.t[-1]
                 self.events.append(f'gz at {start_time:.4f}s')
                 time_array = start_time + np.arange(1, amp_.size + 1) * dtp_
+
+                self.time_sampling_size = np.append(self.time_sampling_size, len(time_array))
+
                 self.t = np.append(self.t, time_array)
 
             for i in range(amp_.size):
@@ -162,7 +171,8 @@ class BMCSim(BMCTool):
                 start_time = self.t[-1]
                 self.events.append(f'delay at {start_time:.4f}s')
                 time_array = start_time + np.arange(1, sample_factor_delay + 1) * dt_delay
-                 # Überspringe das erste Element, falls doppelt
+
+                self.time_sampling_size = np.append(self.time_sampling_size, len(time_array))
             
                 self.t = np.append(self.t, time_array)
 
@@ -321,6 +331,21 @@ class BMCSim(BMCTool):
     
     def print_params(self) -> None:
         return self.params.print_settings()
+    
+    def get_exact(self) -> np.ndarray:
+        time_slices = []
+        magetization_slices = []
+        start = 0
+
+        _, _, _, _, magetization = self.get_mag()
+        
+        for size in self.time_sampling_size:
+            end = int(start + size)
+            time_slices.append(self.t[start:end])
+            magetization_slices.append(magetization[start:end])
+            start = end
+
+        return time_slices, magetization_slices
     
 
     def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, **addParams) -> None:

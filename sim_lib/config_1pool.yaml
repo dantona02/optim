@@ -50,7 +50,7 @@ cest_pool: {
    t1: 1.3,
    t2: 0.1,
    k: 50,
-   dw: 100
+   dw: 8
   }
 }
 
@@ -73,4 +73,4 @@ rel_b1: 1
 verbose: False
 reset_init_mag: True
 scale: 1
-max_pulse_samples: 300
+max_pulse_samples: 1500
