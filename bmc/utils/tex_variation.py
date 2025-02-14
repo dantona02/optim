@@ -3,6 +3,8 @@ import torch
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Optional
+import multiprocessing
+import gc
 
 # Annahme: Diese Funktion muss für PyTorch angepasst werden
 from bmc.simulate import simulate
@@ -143,9 +145,11 @@ def run_variation(seq_path_on: List[str], seq_path_off: List[str], config_path: 
     t_ex, signal = zip(*results)
     return torch.tensor(t_ex), torch.tensor(signal)
 
-def run_sim(seq_path: str, config_path: str, adc_time: float, z_pos: torch.Tensor, 
-            webhook: str, plt_range: Optional[List[float]], get_t: bool) -> Tuple[torch.Tensor, torch.Tensor]:
-    
+def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
+    """
+    Führt eine Simulation durch und gibt je nach get_t entweder
+    (t, m, m_plot) oder nur m zurück.
+    """
     sim = simulate(
         config_file=config_path,
         seq_file=seq_path,
@@ -158,58 +162,66 @@ def run_sim(seq_path: str, config_path: str, adc_time: float, z_pos: torch.Tenso
         webhook=webhook,
         plt_range=plt_range
     )
-    
+    # get_mag liefert üblicherweise (t, _, _, _, m_complex)
     res = sim.get_mag(return_cest_pool=False)
     if get_t:
-        t, _, _, _, m_complex = res
+        _, _, _, _, m_complex = res
+        t, m_plot = sim.get_exact()
     else:
         _, _, _, _, m_complex = res
-    m = torch.abs(m_complex[-600:])
-    return (t, m) if get_t else m
 
-def run_variation_parallel(seq_path_on: str, seq_path_off: str, config_path: str, adc_time: float, 
-                           z_pos: torch.Tensor, webhook: str, show_plot: bool) -> Tuple[Optional[int], Optional[float]]:
-    try:
-        t_ex = 0
-        match = re.search(r'\d+', seq_path_on)
-        if match:
-            t_ex = int(match.group())
+    # Konvertiere das komplexe Ergebnis in einen Torch-Tensor und berechne den Betrag
+    m = torch.abs(m_complex)
+    return (t, m, m_plot) if get_t else m
 
-        num_processes = 2
-        ctx = mp.get_context('spawn')
-        pool = ctx.Pool(processes=num_processes)
-        
-        async_on = pool.apply_async(
-            run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
-        )
-        async_off = pool.apply_async(
-            run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, False)
-        )
-        pool.close()
-        pool.join()
+def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot, save_plot):
+    # Extrahiere t_ex aus dem Dateinamen der on-Sequenz
+    t_ex = 0
+    match = re.search(r'\d+', seq_path_on)
+    if match:
+        t_ex = int(match.group())
 
-        on_result = async_on.get()
-        off_result = async_off.get()
+    # Starte beide Simulationen parallel mittels Multiprocessing
+    num_processes = 2  # ein Prozess für "on", einer für "off"
+    pool = multiprocessing.Pool(processes=num_processes)
+    
+    async_on = pool.apply_async(
+        run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
+    )
+    async_off = pool.apply_async(
+        run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, True)
+    )
+    pool.close()
+    pool.join()
 
-        t, m_on = on_result
-        m_off = off_result
+    on_result = async_on.get()
+    off_result = async_off.get()
 
-        if m_on.shape[0] != 600 or m_off.shape[0] != 600:
-            raise ValueError(f"Arrays too small: m_on={m_on.shape[0]}, m_off={m_off.shape[0]}")
+    t, m_on, m_plot_on = on_result
+    _, m_off, m_plot_off = off_result
 
-        signal_corrected = m_on - m_off
-        signal = torch.max(signal_corrected).item()
+    if m_on.size(0) != m_off.size(0):
+        raise ValueError(f"Arrays m_on and m_off do not have the same length (m_on={m_on.size(0)}, m_off={m_off.size(0)})!")
 
-        if show_plot:
-            plt.plot(t[-600:].cpu().numpy(), signal_corrected.cpu().numpy(), 'o', c='blue', markersize=1)
-            plt.axhline(0, c='black')
-            plt.show()
+    signal_corrected = m_on - m_off
 
-        del m_on, m_off, signal_corrected, t
-        torch.cuda.empty_cache()
+    signal_plot = [torch.abs(mp_on) - torch.abs(mp_off) for mp_on, mp_off in zip(m_plot_on, m_plot_off)]
+    signal = torch.max(signal_corrected)
 
-        return t_ex, signal
+    if show_plot:
+        fig, ax = plt.subplots(dpi=150)
+        # Konvertiere t in ein NumPy-Array zum Plotten
+        # Iteriere über die einzelnen Zeitpunkte und plotte das jeweilige Slice
+        for index, t_val in enumerate(t):
+            ax.plot(t_val.cpu().numpy(), signal_plot[index].cpu().numpy(), 'o', markersize=1)
+        ax.axhline(0, c='black')
+        ax.set_xlim(0.00, 0.005)
+        ax.set_ylim(-0.0008, 0.0003)
+        plt.show()
+        if save_plot:
+            fig.savefig(f"/Users/danielmiksch/Downloads/racete_0ppm.png", dpi=300, bbox_inches='tight')
 
-    except Exception as e:
-        print(f"Error during processing: {e}")
-        return None, None
+    del m_on, m_off, signal_corrected, t
+    gc.collect()
+
+    return t_ex, signal, fig

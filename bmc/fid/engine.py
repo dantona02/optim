@@ -48,6 +48,7 @@ class BMCSim(BMCTool):
         self.t = torch.tensor([0], dtype=torch.float64, device=GLOBAL_DEVICE)
         self.total_vec = None
         self.events = []
+        self.time_sampling_size = torch.tensor([], device=GLOBAL_DEVICE)
 
         self.webhook = webhook
 
@@ -156,7 +157,7 @@ class BMCSim(BMCTool):
                 dtype=torch.float64,
                 device=GLOBAL_DEVICE
             ) * self.dt_adc
-
+            self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
             # Achtung: torch.cat ist nicht in-place, wir überschreiben new_t
             new_t = torch.cat((new_t, time_array))
 
@@ -202,6 +203,7 @@ class BMCSim(BMCTool):
                 start_time = self.t[-1]
                 self.events.append(f'rf at {start_time.item():.4f}s')
                 time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
+                self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
             
             for i in range(amp_.numel()):
@@ -221,6 +223,7 @@ class BMCSim(BMCTool):
                 if counter <= self.n_backlog:
                     start_time = self.t[-1]
                     time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
+                    self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
@@ -237,6 +240,7 @@ class BMCSim(BMCTool):
                 start_time = self.t[-1]
                 self.events.append(f'gz at {start_time.item():.4f}s')
                 time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
+                self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
             for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
@@ -251,6 +255,7 @@ class BMCSim(BMCTool):
                 if counter <= self.n_backlog:
                     start_time = self.t[-1]
                     time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_grad
+                    self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                     self.t = torch.cat((self.t, time_array))
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
@@ -264,6 +269,7 @@ class BMCSim(BMCTool):
                 start_time = self.t[-1]
                 self.events.append(f'rf at {start_time.item():.4f}s')
                 time_array = start_time + torch.arange(1, sample_factor_delay + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dt_delay
+                self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
 
                 for step in range(len(time_array)):
@@ -404,6 +410,33 @@ class BMCSim(BMCTool):
             self.total_vec = torch.stack((m_x_total, m_y_total, m_z_total), dim=-1)
 
             return self.t, torch.abs(m_z), torch.abs(m_z_total), m_trans_c, m_trans_c_total
+        
+    
+
+    def get_exact(self) -> tuple:
+        """
+        Gibt zwei Listen zurück:
+        - time_slices: Liste von Torch-Tensoren, die jeweils einen Zeitslice enthalten
+        - magnetization_slices: Liste von Torch-Tensoren, die jeweils den entsprechenden Slice der Magnetisierung enthalten
+        """
+        time_slices = []
+        magnetization_slices = []
+        start = 0
+
+    
+        _, _, _, _, magnetization = self.get_mag()
+        
+        t = self.t if isinstance(self.t, torch.Tensor) else torch.tensor(self.t)
+        magnetization = (magnetization if isinstance(magnetization, torch.Tensor)
+                        else torch.tensor(magnetization))
+        
+        for size in self.time_sampling_size:
+            end = int(start + size)
+            time_slices.append(t[start:end])
+            magnetization_slices.append(magnetization[start:end])
+            start = end
+
+        return time_slices, magnetization_slices
     
 
 
