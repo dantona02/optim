@@ -208,18 +208,20 @@ def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_p
     signal_plot = [torch.abs(mp_on) - torch.abs(mp_off) for mp_on, mp_off in zip(m_plot_on, m_plot_off)]
     signal = torch.max(signal_corrected)
 
+    
+    fig, ax = plt.subplots(dpi=150)
+
+    for index, t_val in enumerate(t):
+        ax.plot(t_val.cpu().numpy(), signal_plot[index].cpu().numpy(), 'o', markersize=1)
+    ax.axhline(0, c='black')
+    ax.set_xlim(0.00, 0.005)
+    ax.set_ylim(-0.0008, 0.0003)
     if show_plot:
-        fig, ax = plt.subplots(dpi=150)
-        # Konvertiere t in ein NumPy-Array zum Plotten
-        # Iteriere über die einzelnen Zeitpunkte und plotte das jeweilige Slice
-        for index, t_val in enumerate(t):
-            ax.plot(t_val.cpu().numpy(), signal_plot[index].cpu().numpy(), 'o', markersize=1)
-        ax.axhline(0, c='black')
-        ax.set_xlim(0.00, 0.005)
-        ax.set_ylim(-0.0008, 0.0003)
         plt.show()
-        if save_plot:
-            fig.savefig(f"/Users/danielmiksch/Downloads/racete_0ppm.png", dpi=300, bbox_inches='tight')
+    if not show_plot:
+        plt.close(fig)
+    if save_plot:
+        fig.savefig(f"/Users/danielmiksch/Downloads/racete_0ppm.png", dpi=300, bbox_inches='tight')
 
     del m_on, m_off, signal_corrected, t
     gc.collect()
