@@ -96,7 +96,6 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
         ph_interp = np.interp(x_resampled, x_original, ph_unwrapped)
         # Bringe die interpolierte Phase wieder in den Bereich [-π, π]
         ph_wrapped = (ph_interp + np.pi) % (2 * np.pi) - np.pi
-        # Konvertiere zurück in einen Torch-Tensor
         ph_ = torch.tensor(ph_wrapped, dtype=torch.float64, device=GLOBAL_DEVICE)
         
         # Passe den effektiven Zeitschritt an:
