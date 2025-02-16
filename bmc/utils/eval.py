@@ -308,7 +308,7 @@ def plot_sim(
 
 
 
-def calculate_flip_angle(rf_amplitudes_hz: torch.Tensor, dt: float, sim_instance: BMCSim) -> float:
+def calculate_flip_angle(rf_amplitudes_hz: torch.Tensor, dt: float) -> float:
     """
     Calculate the flip angle of a given RF pulse tensor
 

@@ -106,31 +106,104 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
 
     return amp_.to(dtype=torch.float64), ph_.to(dtype=torch.float64), dtp_, delay_after_pulse
 
-def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[torch.Tensor, float, float]:
+# def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[torch.Tensor, float, float]:
+#     """
+#     prep_grad_simulation Resamples the amplitude of a gradient event.
+
+#     Parameters
+#     ----------
+#     block : SimpleNamespace
+#         PyPulseq block event
+#     max_pulse_samples : int
+#         Maximum number of samples for the gradient waveform.
+
+#     Returns
+#     -------
+#     Tuple[torch.Tensor, float, float]
+#         Tuple of resampled amplitude, time step, and delay after gradient.
+
+#     Raises
+#     ------
+#     Exception
+#         If the number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet).
+#     """
+#     amp = torch.tensor(block.gz.waveform, dtype=torch.float64, device=GLOBAL_DEVICE).abs()
+#     idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
+
+#     amp = torch.tensor(block.gz.waveform, dtype=torch.float64, device=GLOBAL_DEVICE)
+
+#     try:
+#         grad_length = amp.size(0)
+#         dtp = float(block.gz.tt[1] - block.gz.tt[0])
+#         delay_after_grad = (grad_length - idx.size(0)) * dtp
+#     except AttributeError:
+#         grad_length = amp.size(0)
+#         dtp = 1e-6
+#         delay_after_grad = (grad_length - idx.size(0)) * dtp
+
+#     amp = amp[idx]
+#     n_unique = torch.unique(amp).size(0)  # Changed from `np.unique` to `torch.unique`
+
+#     # block pulse for seq-files >= 1.4.0
+#     if n_unique == 1 and amp.size(0) == 2:
+#         amp_ = amp[0]
+#         dtp_ = dtp
+#     # block pulse for seq-files < 1.4.0
+#     elif n_unique == 1:
+#         amp_ = amp[0]
+#         dtp_ = dtp * amp.size(0)
+#     # shaped pulse
+#     elif n_unique > max_pulse_samples:
+#         sample_factor = int(torch.ceil(torch.tensor(amp.size(0) / max_pulse_samples, device=GLOBAL_DEVICE)))
+#         amp_ = amp[::sample_factor]
+#         dtp_ = dtp * sample_factor
+#     elif 1 < n_unique < max_pulse_samples:
+#         # Reshape amp to make it compatible with F.interpolate
+#         amp = amp.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, amp.size(0))
+
+#         # Interpolate to exactly `max_pulse_samples`
+#         amp_ = F.interpolate(amp, size=max_pulse_samples, mode='linear', align_corners=True)
+
+#         # Flatten the result back to 1D
+#         amp_ = amp_.squeeze(0).squeeze(0)  # Shape: (max_pulse_samples,)
+
+#         # Adjust dtp
+#         dtp_ = dtp * (amp.size(2) / max_pulse_samples)  # amp.size(2) corresponds to the original length
+
+#         amp_ = amp_.to(GLOBAL_DEVICE)
+        
+#     else:
+#         raise Exception("Unexpected case encountered in prep_grad_simulation.")
+
+#     return amp_, dtp_, delay_after_grad
+
+#!/usr/bin/env python
+# filepath: /Users/danielmiksch/JupyterLab/optim/bmc/bmc_tool.py
+def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int, dtp_rf: float = None) -> Tuple[torch.Tensor, float, float]:
     """
     prep_grad_simulation Resamples the amplitude of a gradient event.
 
     Parameters
     ----------
     block : SimpleNamespace
-        PyPulseq block event
+        PyPulseq block event.
     max_pulse_samples : int
-        Maximum number of samples for the gradient waveform.
+        Maximum number of samples for the original gradient waveform.
+    dtp_rf : float, optional
+        Falls angegeben, wird das Gradientensignal abschließend so resampled,
+        dass der effektive Zeitschritt dtp_ exakt diesem Wert entspricht.
+        (Standard: None => kein zusätzliches Resampling)
 
     Returns
     -------
     Tuple[torch.Tensor, float, float]
-        Tuple of resampled amplitude, time step, and delay after gradient.
-
-    Raises
-    ------
-    Exception
-        If the number of unique samples is larger than 1 but smaller than max_pulse_samples (not implemented yet).
+        Tuple bestehend aus resampled Amplitude, Zeitintervall (dtp_) und Delay nach dem Gradienten.
     """
-    amp = torch.tensor(block.gz.waveform, dtype=torch.float64, device=GLOBAL_DEVICE).abs()
-    idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
+    import torch.nn.functional as F
 
+    # Ursprüngliches Signal aus block.gz.waveform
     amp = torch.tensor(block.gz.waveform, dtype=torch.float64, device=GLOBAL_DEVICE)
+    idx = torch.nonzero(amp > 1e-6, as_tuple=False).squeeze()
 
     try:
         grad_length = amp.size(0)
@@ -142,7 +215,7 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
         delay_after_grad = (grad_length - idx.size(0)) * dtp
 
     amp = amp[idx]
-    n_unique = torch.unique(amp).size(0)  # Changed from `np.unique` to `torch.unique`
+    n_unique = torch.unique(amp).size(0)
 
     # block pulse for seq-files >= 1.4.0
     if n_unique == 1 and amp.size(0) == 2:
@@ -159,24 +232,32 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tupl
         dtp_ = dtp * sample_factor
     elif 1 < n_unique < max_pulse_samples:
         # Reshape amp to make it compatible with F.interpolate
-        amp = amp.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, amp.size(0))
-
-        # Interpolate to exactly `max_pulse_samples`
-        amp_ = F.interpolate(amp, size=max_pulse_samples, mode='linear', align_corners=True)
-
-        # Flatten the result back to 1D
-        amp_ = amp_.squeeze(0).squeeze(0)  # Shape: (max_pulse_samples,)
-
-        # Adjust dtp
-        dtp_ = dtp * (amp.size(2) / max_pulse_samples)  # amp.size(2) corresponds to the original length
-
+        original_length = amp.size(0)
+        amp_unsq = amp.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, original_length)
+        amp_interp = F.interpolate(amp_unsq, size=max_pulse_samples, mode='linear', align_corners=True)
+        amp_ = amp_interp.squeeze(0).squeeze(0)         # Shape: (max_pulse_samples,)
+        dtp_ = dtp * (original_length / max_pulse_samples)
         amp_ = amp_.to(GLOBAL_DEVICE)
-        
     else:
         raise Exception("Unexpected case encountered in prep_grad_simulation.")
 
-    return amp_, dtp_, delay_after_grad
+    # Falls ein gemeinsamer dtp_rf übergeben wurde: resample das gradientensignal
+    if dtp_rf is not None:
+        # Gesamtdauer des ursprünglichen Gradientensignals bestimmen
+        total_duration = grad_length * dtp
+        new_samples = int(round(total_duration / dtp_rf))
+        if new_samples < 1:
+            new_samples = 1
+        # Falls amp_ ein Skalar ist (block-pulse), in einen Vektor umwandeln
+        if amp_.ndim == 0:
+            amp_ = amp_.repeat(new_samples)
+        else:
+            amp_unsq = amp_.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, current_length)
+            amp_resampled = F.interpolate(amp_unsq, size=new_samples, mode='linear', align_corners=True)
+            amp_ = amp_resampled.squeeze(0).squeeze(0)
+        dtp_ = dtp_rf
 
+    return amp_, dtp_, delay_after_grad
 
 class BMCTool:
     """

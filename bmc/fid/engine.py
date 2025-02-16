@@ -123,8 +123,44 @@ class BMCSim(BMCTool):
             current_adc = new_current_adc
 
         elif block.rf and block.gz is not None:
-            if hasattr(block, "block_duration") and block.block_duration != "0":
-                amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
+
+            amp_rf, ph_, dtp_rf, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
+            amp_gz, _, delay_after_grad = prep_grad_simulation(block, self.params.options["max_pulse_samples"], dtp_rf)
+
+            if len(amp_gz) != len(amp_rf):
+                raise Exception(f"Length of RF and gradient amplitudes must be equal, shapes {amp_rf.shape} and {amp_gz.shape}")
+            if counter <= self.n_backlog:
+                start_time = self.t[-1]
+                self.events.append(f'rf at {start_time.item():.4f}s')
+                time_array = start_time + torch.arange(1, amp_rf.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_rf
+                self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
+                self.t = torch.cat((self.t, time_array))
+
+            for i in range(amp_rf.numel()):
+                self.bm_solver.update_matrix(
+                    rf_amp=amp_rf[i],
+                    rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
+                    rf_freq=block.rf.freq_offset,
+                    grad_amp=amp_gz[i]
+                )
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
+                if counter <= self.n_backlog:
+                    self.m_out[:, :, current_adc] = mag.squeeze()
+                    current_adc += 1
+            if delay_after_pulse > 0:
+                self.bm_solver.update_matrix(0, 0, 0)
+                mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
+                if counter <= self.n_backlog:
+                    start_time = self.t[-1]
+                    time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
+                    self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
+                    self.t = torch.cat((self.t, time_array))
+                    self.m_out[:, :, current_adc] = mag.squeeze()
+                    current_adc += 1
+
+            phase_degree = dtp_rf * amp_rf.numel() * 360 * block.rf.freq_offset
+            phase_degree %= 360
+            accum_phase += phase_degree / 180 * torch.pi
 
         # RF pulse
         elif block.rf is not None:
@@ -418,15 +454,14 @@ class BMCSim(BMCTool):
                  axis=2)
         m_vec_total = np.stack(
             (self.total_vec[:, 0],
-            self.total_vec[:, 1],
-            self.total_vec[:, 2]),
+             self.total_vec[:, 1],
+             self.total_vec[:, 2]),
             axis=1
-        ) if total_mag else None
+        ) if total_mag else None 
 
-        
-        
         m_vec_water = m_vec_water[:, ::step]
-        m_vec_total = m_vec_total[::step]  # Schrittweite anwenden
+        if m_vec_total is not None:
+            m_vec_total = m_vec_total[::step]  # Schrittweite anwenden
         middle_idx = np.where(self.z_positions == 0)[0][0]
         m_vec_middle = m_vec_water[middle_idx] if total_mag else None
         render_params = {
@@ -584,4 +619,4 @@ class BMCSim(BMCTool):
         if ipython:
             ipython.run_line_magic('manim', f'-v WARNING {render_params["quality"]} --disable_caching --renderer=opengl {render_params["write"]} Vector3DScene')
         else:
-            print("Magic commands are not supported outside Jupyter notebooks.")   
+            print("Magic commands are not supported outside Jupyter notebooks.")
