@@ -324,7 +324,7 @@ def calculate_flip_angle(rf_amplitudes_hz: torch.Tensor, dt: float) -> float:
     flip_angle_deg = torch.rad2deg(flip_angle_rad).item()
 
     flip_angle_deg = flip_angle_deg % 360
-    if flip_angle_deg > 180:
-        flip_angle_deg = 360 - flip_angle_deg
+    # if flip_angle_deg > 180:
+    #     flip_angle_deg = 360 - flip_angle_deg
 
     return flip_angle_deg

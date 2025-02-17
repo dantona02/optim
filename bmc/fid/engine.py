@@ -136,17 +136,82 @@ class BMCSim(BMCTool):
                 self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
 
-            for i in range(amp_rf.numel()):
+            # Zuerst: bestimme die aktiven Indizes
+            threshold = 1e-6
+            active_mask = amp_rf > threshold
+            active_indices = torch.nonzero(active_mask, as_tuple=False).squeeze()
+
+            # Unterteile in zusammenhängende Gruppen
+            groups = []
+            if active_indices.numel() > 0:
+                group_start = active_indices[0].item()
+                group_end = group_start
+                for idx in active_indices[1:]:
+                    idx_val = idx.item()
+                    if idx_val == group_end + 1:
+                        group_end = idx_val
+                    else:
+                        groups.append((group_start, group_end))
+                        group_start = idx_val
+                        group_end = idx_val
+                groups.append((group_start, group_end))
+            else:
+                # Falls keine aktiven Samples existieren: nimm ein leeres Gruppenarray
+                groups = []
+
+            # Dann: iteriere sampleweise über das gesamte RF-Puls-Array
+            sample_idx = 0
+            for group in groups:
+                start, end = group
+                # Falls es vorher inaktive Samples gibt, verarbeite diese (ohne Phase-Update)
+                while sample_idx < start:
+                    # Bearbeite inaktive Samples (z.B. wenn amp_rf<=threshold)
+                    self.bm_solver.update_matrix(
+                        rf_amp=amp_rf[sample_idx],
+                        rf_phase=-ph_[sample_idx] + block.rf.phase_offset - accum_phase,
+                        rf_freq=block.rf.freq_offset if amp_gz[sample_idx] < threshold else 0,
+                        grad_amp=amp_gz[sample_idx]
+                    )
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
+                    if counter <= self.n_backlog:
+                        self.m_out[:, :, current_adc] = mag.squeeze()
+                        current_adc += 1
+                    sample_idx += 1
+
+                # Jetzt: Verarbeite das aktive Segment sampleweise
+                segment_samples = end - start + 1
+                for i in range(start, end + 1):
+                    self.bm_solver.update_matrix(
+                        rf_amp=amp_rf[i],
+                        rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
+                        rf_freq=block.rf.freq_offset,
+                        grad_amp=amp_gz[i]
+                    )
+                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
+                    if counter <= self.n_backlog:
+                        self.m_out[:, :, current_adc] = mag.squeeze()
+                        current_adc += 1
+                    sample_idx += 1
+                
+                # Nach dem kompletten Pulssegment: update accum_phase einmalig
+                phase_degree = dtp_rf * segment_samples * 360 * block.rf.freq_offset
+                phase_degree %= 360
+                accum_phase += phase_degree / 180 * torch.pi
+
+            # Falls nach dem letzten aktiven Segment noch Samples vorhanden sind, diese abarbeiten
+            while sample_idx < amp_rf.numel():
                 self.bm_solver.update_matrix(
-                    rf_amp=amp_rf[i],
-                    rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
-                    rf_freq=block.rf.freq_offset,
-                    grad_amp=amp_gz[i]
+                    rf_amp=amp_rf[sample_idx],
+                    rf_phase=-ph_[sample_idx] + block.rf.phase_offset - accum_phase,
+                    rf_freq=block.rf.freq_offset if amp_gz[sample_idx] < threshold else 0,
+                    grad_amp=amp_gz[sample_idx]
                 )
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
                 if counter <= self.n_backlog:
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
+                sample_idx += 1
+
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
@@ -158,9 +223,9 @@ class BMCSim(BMCTool):
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
 
-            phase_degree = dtp_rf * amp_rf.numel() * 360 * block.rf.freq_offset
-            phase_degree %= 360
-            accum_phase += phase_degree / 180 * torch.pi
+            # phase_degree = dtp_rf * amp_rf.numel() * 360 * block.rf.freq_offset
+            # phase_degree %= 360
+            # accum_phase += phase_degree / 180 * torch.pi
 
         # RF pulse
         elif block.rf is not None:
@@ -414,7 +479,7 @@ class BMCSim(BMCTool):
         return self.t
     
 
-    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, **addParams) -> None:
+    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, **addParams) -> None:
         """
         Animates the magnetization vector for all isochromats in a 3D plot.
         ----------
@@ -439,25 +504,39 @@ class BMCSim(BMCTool):
         isochromats = self.n_isochromats
 
         # Magnetisierung für Wasserpools vorbereiten
-        if self.params.cest_pools:
+        if animate_cest:
             n_total_pools = len(self.params.cest_pools) + 1
             m_vec_water = np.stack(
-                (self.m_out[:, 0, :],
-                 self.m_out[:, n_total_pools, :],
-                 self.m_out[:, self.params.mz_loc, :]),
-                 axis=2)
+                (self.m_out[:, n_total_pools + 1, :],
+                self.m_out[:, 1, :],
+                self.m_out[:, self.params.mz_loc + 1, :]),
+                axis=2
+            )
+            # Normiere jeden Vektor in m_vec_water auf Länge 1
+            norms = np.linalg.norm(m_vec_water, axis=2, keepdims=True)
+            norms[norms == 0] = 1  # Division durch 0 vermeiden
+            m_vec_water = m_vec_water / norms
         else:
-            m_vec_water = np.stack(
-                (self.m_out[:, 0, :],
-                 self.m_out[:, 1, :],
-                 self.m_out[:, self.params.mz_loc, :]),
-                 axis=2)
+            if self.params.cest_pools is not None:
+                n_total_pools = len(self.params.cest_pools) + 1
+                m_vec_water = np.stack(
+                    (self.m_out[:, 0, :],
+                    self.m_out[:, n_total_pools, :],
+                    self.m_out[:, self.params.mz_loc, :]),
+                    axis=2)
+            else:
+                m_vec_water = np.stack(
+                    (self.m_out[:, 0, :],
+                    self.m_out[:, 1, :],
+                    self.m_out[:, self.params.mz_loc, :]),
+                    axis=2)
+        
         m_vec_total = np.stack(
             (self.total_vec[:, 0],
-             self.total_vec[:, 1],
-             self.total_vec[:, 2]),
+            self.total_vec[:, 1],
+            self.total_vec[:, 2]),
             axis=1
-        ) if total_mag else None 
+        ) if total_mag else None
 
         m_vec_water = m_vec_water[:, ::step]
         if m_vec_total is not None:

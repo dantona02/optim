@@ -158,7 +158,7 @@ def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
         return_zmag=False,
         iso_select=[0],
         show_plot=False,
-        n_backlog=2,
+        n_backlog=2, #2
         webhook=webhook,
         plt_range=plt_range
     )
@@ -214,7 +214,7 @@ def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_p
     for index, t_val in enumerate(t):
         ax.plot(t_val.cpu().numpy(), signal_plot[index].cpu().numpy(), 'o', markersize=1)
     ax.axhline(0, c='black')
-    ax.set_xlim(0.00, 0.005)
+    # ax.set_xlim(0.00, 0.005)
     ax.set_ylim(-0.0008, 0.0003)
     if show_plot:
         plt.show()

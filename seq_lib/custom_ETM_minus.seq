@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 16-Feb-2025 18:41:46
+# Created at: 17-Feb-2025 09:50:14
 
 [VERSION]
 major 1
@@ -19,7 +19,7 @@ FREQ 723.7988
 GradientRasterTime 1e-05 
 M0_offset -8 
 RadiofrequencyRasterTime 1e-06 
-TotalDuration 0.0905 
+TotalDuration 0.089 
 a 90 
 n_ETM 1 
 num_meas 1 
@@ -33,7 +33,7 @@ seq_id_string custom_ETM_minus
 2 450   1   0   0   1  0  0
 3 8000   0   0   0   0  0  0
 4 200   2   0   0   0  0  0
-5 200   0   0   0   2  0  0
+5  50   0   0   0   2  0  0
 6 100   0   0   0   0  1  0
 
 # Format of RF events:
@@ -2050,9 +2050,11 @@ num_samples 4500
 -1e-07
 -1e-07
 9
+-3.5e-06
 0
 0
-499
+497
+3.5e-06
 1e-07
 1e-07
 9
@@ -4060,14 +4062,12 @@ num_samples 4500
 
 shape_id 4
 num_samples 4500
-1e-07
 0
 0
-1998
-0.0199999
+1999
 0.02
 0.02
-47
+48
 0
 0
 398
@@ -4131,8 +4131,7 @@ num_samples 4500
 -0.0204081
 -0.0204082
 -0.0204081
--0.0204081
-0
+-0.0204082
 0
 0
 1998
@@ -6142,31 +6141,14 @@ num_samples 2000
 1998
 
 shape_id 8
-num_samples 2000
-1e-07
-0.0199999
+num_samples 500
+0
 0.02
 0.02
-47
+48
 0
 0
-1898
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
+398
 -0.0204082
 -0.0204081
 -0.0204082
@@ -6178,18 +6160,6 @@ num_samples 2000
 0
 -0.0204081
 -0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204082
-0
--0.0204081
--0.0204082
--0.0204081
--0.0204082
--0.0204082
-0
 -0.0204081
 -0.0204082
 -0.0204082
@@ -6210,16 +6180,43 @@ num_samples 2000
 0
 -0.0204081
 -0.0204082
--0.0204081
--0.0204081
+-0.0204082
 0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204082
+0
+-0.0204081
+-0.0204082
+-0.0204081
+-0.0204082
 
 shape_id 9
-num_samples 2000
+num_samples 500
 0.05
 0.1
 0.1
-1997
+497
 
 
 [SIGNATURE]
@@ -6227,4 +6224,4 @@ num_samples 2000
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 4cec89b86b07aa07957d6003575d5026
+Hash 7ba5ca9e37c50638c270ff8eb278b4a3
