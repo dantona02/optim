@@ -33,7 +33,7 @@ class DifferentiableBMCSimWrapper(nn.Module):
 
         return mag
 
-    def forward(self, pulse_params, grad_params=None):
+    def forward(self, pulse_params=None, grad_params=None):
         """
         Erweiterter Forward-Pass:
         - pulse_params: RF-Parameter (Tensor)
@@ -57,40 +57,42 @@ class DifferentiableBMCSimWrapper(nn.Module):
                 counter = np.abs(total_events - i)
                 if block.rf is not None:
                     if pulse_params is None:
-                        # Falls keine passenden Parameter vorhanden sind, nur run_adc
-                        current_adc, accum_phase, mag = self.sim_engine.run_adc(block, current_adc, accum_phase, mag, counter)
-                        continue
-
-                    _, ph_, dtp_, delay_after_pulse = prep_rf_simulation(
-                        block, self.sim_engine.params.options["max_pulse_samples"]
-                    )
-                    rf_offset = offset if block.rf.freq_offset != 0.0 else 0.0
-            
-                    for step_idx in range(pulse_params[rf_counter].numel()):
-                        self.sim_engine.bm_solver.update_matrix(
-                            rf_amp=pulse_params[rf_counter][step_idx],
-                            rf_phase=-ph_[step_idx] + block.rf.phase_offset - accum_phase,
-                            rf_freq=rf_offset,
+                        # Falls keine RF-Parameter vorhanden sind, nur run_adc ausführen oder überspringen
+                        block.rf.freq_offset = offset if block.rf.freq_offset != 0.0 else 0.0
+                        current_adc, accum_phase, mag = self.sim_engine.run_adc(
+                            block, current_adc, accum_phase, mag, counter
                         )
-                        mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=dtp_)
-                        if counter <= self.sim_engine.n_backlog:
-                            self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
-                            current_adc += 1
+                    else:
+                        _, ph_, dtp_, delay_after_pulse = prep_rf_simulation(
+                            block, self.sim_engine.params.options["max_pulse_samples"]
+                        )
+                        rf_offset = offset if block.rf.freq_offset != 0.0 else 0.0
 
-                    if delay_after_pulse > 0:
-                        self.sim_engine.bm_solver.update_matrix(0, 0, 0)
-                        mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
-                        if counter <= self.sim_engine.n_backlog:
-                            start_time = self.t[-1]
-                            time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
-                            self.t = torch.cat((self.t, time_array))
-                            self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
-                            current_adc += 1
+                        for step_idx in range(pulse_params[rf_counter].numel()):
+                            self.sim_engine.bm_solver.update_matrix(
+                                rf_amp=pulse_params[rf_counter][step_idx],
+                                rf_phase=-ph_[step_idx] + block.rf.phase_offset - accum_phase,
+                                rf_freq=rf_offset,
+                            )
+                            mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=dtp_)
+                            if counter <= self.sim_engine.n_backlog:
+                                self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
+                                current_adc += 1
 
-                    phase_degree = dtp_ * pulse_params[rf_counter].numel() * 360 * block.rf.freq_offset
-                    phase_degree %= 360
-                    accum_phase += phase_degree / 180 * torch.pi
-                    rf_counter += 1
+                        if delay_after_pulse > 0:
+                            self.sim_engine.bm_solver.update_matrix(0, 0, 0)
+                            mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
+                            if counter <= self.sim_engine.n_backlog:
+                                start_time = self.t[-1]
+                                time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
+                                self.t = torch.cat((self.t, time_array))
+                                self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
+                                current_adc += 1
+
+                        phase_degree = dtp_ * pulse_params[rf_counter].numel() * 360 * block.rf.freq_offset
+                        phase_degree %= 360
+                        accum_phase += phase_degree / 180 * torch.pi
+                        rf_counter += 1
 
                 elif block.gz is not None:
                     if grad_params is None or grad_counter >= len(grad_params):
