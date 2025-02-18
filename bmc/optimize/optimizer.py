@@ -134,10 +134,9 @@ class DifferentiableBMCSimWrapper(nn.Module):
 
 if __name__ == "__main__":
   
-    seq_file = 'seq_lib/RACETE.seq'
-    config_file = 'sim_lib/config_1pool.yaml'
-    seq_file = Path(seq_file).resolve()
-    config_file = Path(config_file).resolve()
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    config_file = base_dir / "sim_lib" / "config_1pool.yaml"
+    seq_file = base_dir / "seq_lib" / "RACETE.seq"
 
     if not Path(config_file).exists():
         raise FileNotFoundError(f"File {config_file} not found.")
