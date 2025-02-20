@@ -244,6 +244,7 @@ class BMCSim(BMCTool):
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
                     rf_freq=block.rf.freq_offset,
                 )
+                
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                 if counter <= self.n_backlog:
                     self.m_out[:, :, current_adc] = mag.squeeze()
@@ -399,8 +400,8 @@ class BMCSim(BMCTool):
 
         if return_cest_pool and self.params.cest_pools:
 
-            m_x = self.m_out[:, n_total_pools + 1, :]
-            m_y = self.m_out[:, 1, :]
+            m_x = self.m_out[:, 1, :]
+            m_y = self.m_out[:, n_total_pools + 1, :]
             m_z = self.m_out[:, self.params.mz_loc + 1, :]
 
             m_x_total = torch.sum(m_x, dim=0)
@@ -507,8 +508,8 @@ class BMCSim(BMCTool):
         if animate_cest:
             n_total_pools = len(self.params.cest_pools) + 1
             m_vec_water = np.stack(
-                (self.m_out[:, n_total_pools + 1, :],
-                self.m_out[:, 1, :],
+                (self.m_out[:, 1, :],
+                 self.m_out[:, n_total_pools + 1, :],
                 self.m_out[:, self.params.mz_loc + 1, :]),
                 axis=2
             )
