@@ -73,4 +73,4 @@ rel_b1: 1
 verbose: False
 reset_init_mag: True
 scale: 1
-max_pulse_samples: 800
+max_pulse_samples: 300
