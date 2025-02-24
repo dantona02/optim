@@ -49,11 +49,24 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
     import torch.nn.functional as F
     from bmc.utils.global_device import GLOBAL_DEVICE
 
-    # Ursprüngliche Amplitude und Phase im Komplexformat auslesen
-    amp_full = torch.tensor(block.rf.signal, dtype=torch.complex64, device=GLOBAL_DEVICE).abs()
-    ph_full = torch.angle(torch.tensor(block.rf.signal, dtype=torch.complex64, device=GLOBAL_DEVICE))
+    t_tensor = torch.tensor(block.rf.t, dtype=torch.float64, device=GLOBAL_DEVICE)
+    rf_signal_tensor = torch.tensor(block.rf.signal, dtype=torch.complex64, device=GLOBAL_DEVICE)
 
-    # fimde den Index­Bereich, in dem das Signal > 1e-6 ist
+    # Neuer Code: Wandlung der Parameter in Tensoren und Nutzung eines komplexen Konstanten-Tensors
+    phase = torch.tensor(block.rf.phase_offset, dtype=torch.float64, device=GLOBAL_DEVICE)
+    freq  = torch.tensor(block.rf.freq_offset, dtype=torch.float64, device=GLOBAL_DEVICE)
+    complex_const = torch.tensor(1j, dtype=torch.complex64, device=GLOBAL_DEVICE)
+    
+    w1_complex = (rf_signal_tensor) \
+        * torch.exp(complex_const * phase) \
+        * torch.exp(complex_const * 2 * torch.pi * freq * t_tensor)
+
+    # amp_full = torch.real(w1_complex)
+    # ph_full = torch.imag(w1_complex)
+
+    amp_full = torch.abs(w1_complex)
+    ph_full = torch.angle(w1_complex)
+
     idx_active = torch.nonzero(amp_full > 1e-6, as_tuple=False).squeeze()
 
     try:

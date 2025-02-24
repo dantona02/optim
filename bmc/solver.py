@@ -208,6 +208,7 @@ class BlochMcConnellSolver:
         # Set off-resonance terms for CEST pools
         for i in range(1, n_p + 1):
             # dwi: Differenz zwischen dem pool-spezifischen offset und dem Wasseroffset plus B0-Inhomogenität
+            # print(rf_freq_2pi)
             dwi = self.dw_tensors[i - 1] * self.w0 - (rf_freq_2pi + self.dw0)
             new_arr_a[:, :, i, i + n_p + 1] = -dwi.unsqueeze(1)
             new_arr_a[:, :, i + n_p + 1, i] = dwi.unsqueeze(1)

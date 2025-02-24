@@ -168,8 +168,8 @@ class BMCSim(BMCTool):
                     # Bearbeite inaktive Samples (z.B. wenn amp_rf<=threshold)
                     self.bm_solver.update_matrix(
                         rf_amp=amp_rf[sample_idx],
-                        rf_phase=-ph_[sample_idx] + block.rf.phase_offset - accum_phase,
-                        rf_freq=block.rf.freq_offset if amp_gz[sample_idx] < threshold else 0,
+                        rf_phase=-ph_[sample_idx] - accum_phase,
+                        rf_freq=0,                         # immer 0
                         grad_amp=amp_gz[sample_idx]
                     )
                     mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
@@ -183,8 +183,8 @@ class BMCSim(BMCTool):
                 for i in range(start, end + 1):
                     self.bm_solver.update_matrix(
                         rf_amp=amp_rf[i],
-                        rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
-                        rf_freq=block.rf.freq_offset,
+                        rf_phase=-ph_[i] - accum_phase,
+                        rf_freq=0,
                         grad_amp=amp_gz[i]
                     )
                     mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
@@ -202,8 +202,8 @@ class BMCSim(BMCTool):
             while sample_idx < amp_rf.numel():
                 self.bm_solver.update_matrix(
                     rf_amp=amp_rf[sample_idx],
-                    rf_phase=-ph_[sample_idx] + block.rf.phase_offset - accum_phase,
-                    rf_freq=block.rf.freq_offset if amp_gz[sample_idx] < threshold else 0,
+                    rf_phase=-ph_[sample_idx] - accum_phase,
+                    rf_freq=0 if amp_gz[sample_idx] < threshold else 0,  # immer 0
                     grad_amp=amp_gz[sample_idx]
                 )
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
@@ -241,8 +241,8 @@ class BMCSim(BMCTool):
             for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
-                    rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
-                    rf_freq=block.rf.freq_offset,
+                    rf_phase=ph_[i], #- accum_phase,  # statt -ph_[i] + block.rf.phase_offset - accum_phase
+                    rf_freq=0,                        # Frequenzoffset immer 0
                 )
                 
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
