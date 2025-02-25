@@ -33,16 +33,14 @@ class DifferentiableBMCSimWrapper(nn.Module):
 
         return mag
 
-    def forward(self, pulse_params=None, grad_params=None):
+    def forward(self, rf_params=None, grad_params=None):
         """
-        Erweiterter Forward-Pass:
-        - pulse_params: RF-Parameter (Tensor)
-        - grad_params: (Optional) Gradient-Parameter (Tensor)
+        Extended Forward Pass:
+        - rf_params: List of [amplitude_tensor, phase_tensor] for each RF pulse
+        - grad_params: (Optional) Gradient parameters (Tensor)
         """
-    
         rf_freq_offset = [1, -1]
         signals = []
-        
 
         for offset in rf_freq_offset:
             mag = self.reset_simulation()
@@ -55,23 +53,22 @@ class DifferentiableBMCSimWrapper(nn.Module):
                 block = self.sim_engine.seq.get_block(block_event)
                 counter = np.abs(total_events - i)
                 if block.rf is not None:
-                    if pulse_params is None:
-                        # Falls keine RF-Parameter vorhanden sind, nur run_adc ausführen oder überspringen
+                    if rf_params is None:
                         block.rf.freq_offset = offset if block.rf.freq_offset != 0.0 else 1
                         current_adc, mag = self.sim_engine.run_adc(
                             block, current_adc, mag, counter
                         )
                     else:
-                        _, ph_, dtp_, delay_after_pulse = prep_rf_simulation(
+                        _, _, dtp_, delay_after_pulse = prep_rf_simulation(
                             block, self.sim_engine.params.options["max_pulse_samples"]
                         )
                         rf_offset = offset if block.rf.freq_offset != 0.0 else 0.0
-
-
-                        for step_idx in range(pulse_params[rf_counter].numel()):
+                        
+                        amp_params, phase_params = rf_params[rf_counter]
+                        for step_idx in range(amp_params.numel()):
                             self.sim_engine.bm_solver.update_matrix(
-                                rf_amp=pulse_params[rf_counter][step_idx],
-                                rf_phase=rf_offset * ph_[step_idx],
+                                rf_amp=amp_params[step_idx],
+                                rf_phase=rf_offset * phase_params[step_idx],
                                 rf_freq=0,
                             )
                             mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=dtp_)
@@ -88,10 +85,11 @@ class DifferentiableBMCSimWrapper(nn.Module):
                                 self.t = torch.cat((self.t, time_array))
                                 self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
                                 current_adc += 1
+                        
+                        rf_counter += 1
 
                 elif block.gz is not None:
                     if grad_params is None or grad_counter >= len(grad_params):
-                        # Falls keine passenden Gradient-Parameter vorhanden sind, run_adc
                         current_adc, mag = self.sim_engine.run_adc(block, current_adc, mag, counter)
                         continue
 
@@ -130,7 +128,6 @@ class DifferentiableBMCSimWrapper(nn.Module):
         return difference
 
 if __name__ == "__main__":
-  
     base_dir = Path(__file__).resolve().parent.parent.parent
     config_file = base_dir / "sim_lib" / "config_1pool.yaml"
     seq_file = base_dir / "seq_lib" / "RACETE.seq"
@@ -151,12 +148,12 @@ if __name__ == "__main__":
     z_pos = torch.cat((z_pos, torch.tensor([0.0]))) 
 
     sim_engine_instance = BMCSim(adc_time=5e-3,
-                                 params=sim_params,
-                                 seq_file=seq_file,
-                                 z_positions=z_pos,
-                                 n_backlog=1,
-                                 verbose=True,
-                                 webhook=False)
+                                params=sim_params,
+                                seq_file=seq_file,
+                                z_positions=z_pos,
+                                n_backlog=1,
+                                verbose=True,
+                                webhook=False)
     diff_sim = DifferentiableBMCSimWrapper(sim_engine_instance)
     
     rf_parameters_list = []
@@ -167,7 +164,8 @@ if __name__ == "__main__":
             amp_rf, ph_rf, dtp_rf, _ = prep_rf_simulation(
                 block, diff_sim.sim_engine.params.options["max_pulse_samples"]
             )
-            rf_parameters_list.append(amp_rf)
+            # Store both amplitude and phase parameters
+            rf_parameters_list.append([amp_rf, ph_rf])
         if block.gz is not None:
             amp_gz, dtp_gz, delay_after_grad = prep_grad_simulation(
                 block, diff_sim.sim_engine.params.options["max_pulse_samples"]
@@ -175,10 +173,17 @@ if __name__ == "__main__":
             grad_parameters_list.append(amp_gz)
 
     if rf_parameters_list:
-        rf_parameters_tensor = torch.stack(rf_parameters_list)
-        rf_parameters_tensor.requires_grad_(True)
+        # Convert list of [amp, phase] pairs into a list of tensors that require gradients
+        rf_amp_tensors = []
+        rf_phase_tensors = []
+        for amp, phase in rf_parameters_list:
+            amp_tensor = amp.clone().detach().requires_grad_(True)
+            phase_tensor = phase.clone().detach().requires_grad_(True)
+            rf_amp_tensors.append(amp_tensor)
+            rf_phase_tensors.append(phase_tensor)
+        rf_parameters = list(zip(rf_amp_tensors, rf_phase_tensors))
     else:
-        rf_parameters_tensor = None
+        rf_parameters = None
 
     if grad_parameters_list:
         grad_parameters_tensor = torch.stack(grad_parameters_list)
@@ -186,10 +191,16 @@ if __name__ == "__main__":
     else:
         grad_parameters_tensor = None
 
-    end_signal = diff_sim(rf_parameters_tensor, grad_params=grad_parameters_tensor)
+    end_signal = diff_sim(rf_parameters, grad_params=grad_parameters_tensor)
     print("Endsignal:", end_signal.item())
     end_signal.backward()
-    if rf_parameters_tensor is not None:
-        print("Gradienten für RF:", rf_parameters_tensor.grad)
+    
+    if rf_parameters is not None:
+        print("\nGradienten für RF:")
+        for i, (amp_tensor, phase_tensor) in enumerate(rf_parameters):
+            print(f"RF Pulse {i}:")
+            print("Amplitude grad:", amp_tensor.grad)
+            print("Phase grad:", phase_tensor.grad)
+    
     if grad_parameters_tensor is not None:
-        print("Gradienten für GZ:", grad_parameters_tensor.grad)
+        print("\nGradienten für GZ:", grad_parameters_tensor.grad)
