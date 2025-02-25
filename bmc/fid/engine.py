@@ -53,7 +53,7 @@ class BMCSim(BMCTool):
         self.webhook = webhook
 
 
-    def run_adc(self, block, current_adc, accum_phase, mag, counter) -> Tuple[int, float, torch.Tensor]:
+    def run_adc(self, block, current_adc, mag, counter) -> Tuple[int, torch.Tensor]:
         """
         Handles the simulation of ADC, RF, and gradient blocks.
         Updates the time array, magnetization output, and accumulated phase.
@@ -64,8 +64,6 @@ class BMCSim(BMCTool):
             The current block in the sequence.
         current_adc : int
             The current ADC index.
-        accum_phase : float
-            The accumulated RF phase.
         mag : torch.Tensor
             The current magnetization vector.
 
@@ -73,8 +71,6 @@ class BMCSim(BMCTool):
         -------
         current_adc : int
             Updated ADC index.
-        accum_phase : float
-            Updated accumulated phase.
         mag : torch.Tensor
             Updated magnetization vector.
         """
@@ -83,7 +79,6 @@ class BMCSim(BMCTool):
             new_events = self.events.copy()
             new_m_out = self.m_out.clone()
             new_t = self.t.clone()
-            new_accum_phase = accum_phase
             new_current_adc = current_adc
 
             start_time = new_t[-1]
@@ -113,13 +108,11 @@ class BMCSim(BMCTool):
                 src_for_scatter = mag.squeeze().unsqueeze(-1)
 
                 new_m_out = new_m_out.scatter(dim=2, index=index_for_scatter, src=src_for_scatter)
-                new_accum_phase = 0
                 new_current_adc += 1
 
             self.events = new_events
             self.m_out = new_m_out
             self.t = new_t
-            accum_phase = new_accum_phase
             current_adc = new_current_adc
 
         elif block.rf and block.gz is not None:
@@ -168,7 +161,7 @@ class BMCSim(BMCTool):
                     # Bearbeite inaktive Samples (z.B. wenn amp_rf<=threshold)
                     self.bm_solver.update_matrix(
                         rf_amp=amp_rf[sample_idx],
-                        rf_phase=-ph_[sample_idx] - accum_phase,
+                        rf_phase=-ph_[sample_idx],
                         rf_freq=0,                         # immer 0
                         grad_amp=amp_gz[sample_idx]
                     )
@@ -183,7 +176,7 @@ class BMCSim(BMCTool):
                 for i in range(start, end + 1):
                     self.bm_solver.update_matrix(
                         rf_amp=amp_rf[i],
-                        rf_phase=-ph_[i] - accum_phase,
+                        rf_phase=-ph_[i],
                         rf_freq=0,
                         grad_amp=amp_gz[i]
                     )
@@ -193,16 +186,12 @@ class BMCSim(BMCTool):
                         current_adc += 1
                     sample_idx += 1
                 
-                # Nach dem kompletten Pulssegment: update accum_phase einmalig
-                phase_degree = dtp_rf * segment_samples * 360 * block.rf.freq_offset
-                phase_degree %= 360
-                accum_phase += phase_degree / 180 * torch.pi
 
             # Falls nach dem letzten aktiven Segment noch Samples vorhanden sind, diese abarbeiten
             while sample_idx < amp_rf.numel():
                 self.bm_solver.update_matrix(
                     rf_amp=amp_rf[sample_idx],
-                    rf_phase=-ph_[sample_idx] - accum_phase,
+                    rf_phase=-ph_[sample_idx],
                     rf_freq=0 if amp_gz[sample_idx] < threshold else 0,  # immer 0
                     grad_amp=amp_gz[sample_idx]
                 )
@@ -223,9 +212,6 @@ class BMCSim(BMCTool):
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
 
-            # phase_degree = dtp_rf * amp_rf.numel() * 360 * block.rf.freq_offset
-            # phase_degree %= 360
-            # accum_phase += phase_degree / 180 * torch.pi
 
         # RF pulse
         elif block.rf is not None:
@@ -241,7 +227,7 @@ class BMCSim(BMCTool):
             for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
-                    rf_phase=ph_[i], #- accum_phase,  # statt -ph_[i] + block.rf.phase_offset - accum_phase
+                    rf_phase=ph_[i],  # statt -ph_[i] + block.rf.phase_offset - accum_phase
                     rf_freq=0,                        # Frequenzoffset immer 0
                 )
                 
@@ -261,9 +247,6 @@ class BMCSim(BMCTool):
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
 
-            phase_degree = dtp_ * amp_.numel() * 360 * block.rf.freq_offset
-            phase_degree %= 360
-            accum_phase += phase_degree / 180 * torch.pi
 
         # spoiling gradient
         elif block.gz is not None:
@@ -317,7 +300,7 @@ class BMCSim(BMCTool):
         else:
             raise Exception("Unknown case")
 
-        return current_adc, accum_phase, mag
+        return current_adc, mag
 
     def run_fid(self) -> None:
         """
@@ -327,7 +310,6 @@ class BMCSim(BMCTool):
             self.run_m0_scan = True
 
         current_adc = 1
-        accum_phase = 0
 
         mag = torch.tensor(
             self.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
@@ -362,13 +344,13 @@ class BMCSim(BMCTool):
                 start_time = time.time()
                 for i, block_event in loop_block_events:
                     block = self.seq.get_block(block_event)
-                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag)
+                    current_adc, mag = self.run_adc(block, current_adc, mag)
                     notifier.update_progress(i)
             else:
                 for i, block_event in loop_block_events:
                     counter = np.abs(total_events - i)
                     block = self.seq.get_block(block_event)
-                    current_adc, accum_phase, mag = self.run_adc(block, current_adc, accum_phase, mag, counter)
+                    current_adc, mag = self.run_adc(block, current_adc, mag, counter)
                 
             self.m_out = self.m_out[:, :, :self.t.numel()]
             print(self.events)
