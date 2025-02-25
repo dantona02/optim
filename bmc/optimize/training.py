@@ -203,17 +203,27 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
     Returns:
         Tuple of (optimized_rf_parameters, optimized_gradient_parameters)
     """
-    # Initialisiere Parameter und Optimizer
+    # Initialize parameters and optimizer
     if resume_from is None:
         rf_parameters, grad_parameters_tensor, sim_params, seq_file, z_pos = get_params()
         start_epoch = 0
         best_loss = float('inf')
     else:
-        # Lade Parameter aus Checkpoint
-        sim_params, seq_file, z_pos = get_params()[2:]  # Hole nur die Sim-Parameter
+        # Load parameters from checkpoint
+        sim_params, seq_file, z_pos = get_params()[2:]  # Get only sim params
         rf_parameters, grad_parameters_tensor, start_epoch, best_loss, _ = load_checkpoint(resume_from)
     
-    # Sammle alle Parameter für den Optimizer
+    # Create simulation instance
+    sim_engine_instance = BMCSim(adc_time=5e-3,
+                               params=sim_params,
+                               seq_file=seq_file,
+                               z_positions=z_pos,
+                               n_backlog=0,
+                               verbose=True,
+                               webhook=False)
+    diff_sim = DifferentiableBMCSimWrapper(sim_engine_instance)
+    
+    # Collect all parameters for optimizer
     all_parameters = []
     if rf_parameters:
         for amp_tensor, phase_tensor in rf_parameters:
@@ -224,7 +234,7 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
     optimizer = optim.Adam(all_parameters, lr=learning_rate)
     
     if resume_from:
-        # Lade Optimizer-Zustand wenn wir von Checkpoint fortsetzen
+        # Load optimizer state if resuming from checkpoint
         _, _, _, _, _ = load_checkpoint(resume_from, optimizer)
     
     # Initialize plotting
@@ -234,15 +244,6 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
     epochs = []
 
     for epoch in range(start_epoch, num_epochs):
-        sim_engine_instance = BMCSim(adc_time=5e-3,
-                                   params=sim_params,
-                                   seq_file=seq_file,
-                                   z_positions=z_pos,
-                                   n_backlog=0,
-                                   verbose=True,
-                                   webhook=False)
-        diff_sim = DifferentiableBMCSimWrapper(sim_engine_instance)
-        
         optimizer.zero_grad()
         end_signal = diff_sim(rf_parameters, grad_params=grad_parameters_tensor)
         loss = l2_loss_function(end_signal)
@@ -272,7 +273,7 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
         
         print(f"Epoch {epoch}: Loss = {loss.item()}, End Signal = {end_signal.item()}")
         
-        # Speichere Checkpoint
+        # Save checkpoint
         if (epoch + 1) % checkpoint_frequency == 0:
             save_checkpoint(
                 checkpoint_dir,
@@ -284,7 +285,7 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
                 end_signal.item()
             )
             
-        # Speichere zusätzlich besten Checkpoint
+        # Save best checkpoint
         if loss.item() < best_loss:
             best_loss = loss.item()
             save_checkpoint(
@@ -298,7 +299,7 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
                 'best_checkpoint.pt'
             )
     
-    # Speichere finalen Zustand
+    # Save final state
     save_checkpoint(
         checkpoint_dir,
         rf_parameters,
@@ -315,7 +316,7 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
 if __name__ == "__main__":
     # Example for training with checkpoint support
     rf_params_optimized, grad_params_optimized = train(
-        num_epochs=50,
+        num_epochs=10,
         checkpoint_frequency=5,
         # resume_from='checkpoints/checkpoint_epoch_20.pt'  # Optional for resuming
     )

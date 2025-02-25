@@ -23,19 +23,43 @@ class DifferentiableBMCSimWrapper(nn.Module):
 
     def reset_simulation(self):
         """
-        Reset the simulation state.
-        Assumes self.sim_engine.m_init is provided as NumPy array or tensor.
+        Reset all simulation states to their initial values.
+        This ensures exact equivalence with a fresh initialization.
         
         Returns:
             Initial magnetization tensor
         """
+        # Reset magnetization to initial state
         mag = torch.tensor(
             self.sim_engine.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
             dtype=torch.float64,
             device=GLOBAL_DEVICE
         )
+        
+        # Reset time to 0
         self.sim_engine.t = torch.tensor([0.0], dtype=torch.float64, device=GLOBAL_DEVICE)
+        
+        # Reset solver parameters
         self.sim_engine.bm_solver.update_params(self.sim_engine.params)
+        
+        # Reset output tensor to initial state
+        self.sim_engine.m_out = torch.zeros(
+            self.sim_engine.n_isochromats, 
+            self.sim_engine.m_init.shape[0], 
+            self.sim_engine.n_measure, 
+            dtype=torch.float64, 
+            device=GLOBAL_DEVICE
+        )
+        self.sim_engine.m_out[:, :, 0] = torch.tensor(
+            self.sim_engine.m_init, 
+            dtype=torch.float64, 
+            device=GLOBAL_DEVICE
+        ).unsqueeze(0)
+        
+        # Reset event tracking
+        self.sim_engine.events = []
+        self.sim_engine.time_sampling_size = torch.tensor([], device=GLOBAL_DEVICE)
+        self.sim_engine.total_vec = None
 
         return mag
 
