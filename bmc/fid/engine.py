@@ -129,77 +129,17 @@ class BMCSim(BMCTool):
                 self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
 
-            # Zuerst: bestimme die aktiven Indizes
-            threshold = 1e-6
-            active_mask = amp_rf > threshold
-            active_indices = torch.nonzero(active_mask, as_tuple=False).squeeze()
-
-            # Unterteile in zusammenhängende Gruppen
-            groups = []
-            if active_indices.numel() > 0:
-                group_start = active_indices[0].item()
-                group_end = group_start
-                for idx in active_indices[1:]:
-                    idx_val = idx.item()
-                    if idx_val == group_end + 1:
-                        group_end = idx_val
-                    else:
-                        groups.append((group_start, group_end))
-                        group_start = idx_val
-                        group_end = idx_val
-                groups.append((group_start, group_end))
-            else:
-                # Falls keine aktiven Samples existieren: nimm ein leeres Gruppenarray
-                groups = []
-
-            # Dann: iteriere sampleweise über das gesamte RF-Puls-Array
-            sample_idx = 0
-            for group in groups:
-                start, end = group
-                # Falls es vorher inaktive Samples gibt, verarbeite diese (ohne Phase-Update)
-                while sample_idx < start:
-                    # Bearbeite inaktive Samples (z.B. wenn amp_rf<=threshold)
-                    self.bm_solver.update_matrix(
-                        rf_amp=amp_rf[sample_idx],
-                        rf_phase=-ph_[sample_idx],
-                        rf_freq=0,                         # immer 0
-                        grad_amp=amp_gz[sample_idx]
-                    )
-                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
-                    if counter <= self.n_backlog:
-                        self.m_out[:, :, current_adc] = mag.squeeze()
-                        current_adc += 1
-                    sample_idx += 1
-
-                # Jetzt: Verarbeite das aktive Segment sampleweise
-                segment_samples = end - start + 1
-                for i in range(start, end + 1):
-                    self.bm_solver.update_matrix(
-                        rf_amp=amp_rf[i],
-                        rf_phase=-ph_[i],
-                        rf_freq=0,
-                        grad_amp=amp_gz[i]
-                    )
-                    mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
-                    if counter <= self.n_backlog:
-                        self.m_out[:, :, current_adc] = mag.squeeze()
-                        current_adc += 1
-                    sample_idx += 1
-                
-
-            # Falls nach dem letzten aktiven Segment noch Samples vorhanden sind, diese abarbeiten
-            while sample_idx < amp_rf.numel():
+            for i in range(amp_rf.numel()):
                 self.bm_solver.update_matrix(
-                    rf_amp=amp_rf[sample_idx],
-                    rf_phase=-ph_[sample_idx],
-                    rf_freq=0 if amp_gz[sample_idx] < threshold else 0,  # immer 0
-                    grad_amp=amp_gz[sample_idx]
+                    rf_amp=amp_rf[i],
+                    rf_phase=ph_[i],  # statt -ph_[i] + block.rf.phase_offset - accum_phase
+                    grad_amp=amp_gz[i],
+                    rf_freq=0,                        # Frequenzoffset immer 0
                 )
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
                 if counter <= self.n_backlog:
                     self.m_out[:, :, current_adc] = mag.squeeze()
                     current_adc += 1
-                sample_idx += 1
 
             if delay_after_pulse > 0:
                 self.bm_solver.update_matrix(0, 0, 0)
@@ -258,6 +198,7 @@ class BMCSim(BMCTool):
                 time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
+
             for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)
