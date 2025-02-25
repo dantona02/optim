@@ -148,8 +148,8 @@ if __name__ == "__main__":
     
     sim_params = load_params(config_file)
 
-    low = -20e-6
-    high = 20e-6
+    low = -1e-3
+    high = 1e-3
     n_iso = 100
     z_pos = np.linspace(low, high, n_iso)
     z_pos = torch.tensor(z_pos)
