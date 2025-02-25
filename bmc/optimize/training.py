@@ -125,7 +125,8 @@ def get_params():
     """
     base_dir = Path(__file__).resolve().parent.parent.parent
     config_file = base_dir / "sim_lib" / "config_1pool.yaml"
-    seq_file = base_dir / "seq_lib" / "RACETE.seq"
+#     seq_file = base_dir / "seq_lib" / "RACETE.seq"
+    seq_file = base_dir / "seq_lib" / "custom_ETM.seq"
 
     if not Path(config_file).exists():
         raise FileNotFoundError(f"File {config_file} not found.")
@@ -218,7 +219,7 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
                                params=sim_params,
                                seq_file=seq_file,
                                z_positions=z_pos,
-                               n_backlog=0,
+                               n_backlog=1,
                                verbose=True,
                                webhook=False)
     diff_sim = DifferentiableBMCSimWrapper(sim_engine_instance)

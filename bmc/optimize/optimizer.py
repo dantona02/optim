@@ -87,7 +87,60 @@ class DifferentiableBMCSimWrapper(nn.Module):
             for i, block_event in enumerate(self.sim_engine.seq.block_events, start=1):
                 block = self.sim_engine.seq.get_block(block_event)
                 counter = np.abs(total_events - i)
-                if block.rf is not None:
+
+                # Behandle RF und Gradient gleichzeitig
+                if block.rf is not None and block.gz is not None:
+                    if rf_params is None:
+                        current_adc, mag = self.sim_engine.run_adc(block, current_adc, mag, counter)
+                        continue
+
+                    amp_rf, ph_rf, dtp_rf, delay_after_pulse = prep_rf_simulation(
+                        block, self.sim_engine.params.options["max_pulse_samples"]
+                    )
+                    amp_gz, dtp_gz, delay_after_grad = prep_grad_simulation(
+                        block, self.sim_engine.params.options["max_pulse_samples"],
+                        dtp_rf
+                    )
+
+                    if len(amp_gz) != len(amp_rf):
+                        raise Exception(f"Length of RF and gradient amplitudes must be equal, shapes {amp_rf.shape} and {amp_gz.shape}")
+
+                    rf_offset = offset if block.rf.freq_offset != 0.0 else 1
+                    amp_params, phase_params = rf_params[rf_counter]
+                    grad_param = grad_params[grad_counter] if grad_params is not None else amp_gz
+
+                    if counter <= self.sim_engine.n_backlog:
+                        start_time = self.sim_engine.t[-1]
+                        time_array = start_time + torch.arange(1, amp_params.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_rf
+                        self.sim_engine.t = torch.cat((self.sim_engine.t, time_array))
+
+                    for step_idx in range(amp_params.numel()):
+                        self.sim_engine.bm_solver.update_matrix(
+                            rf_amp=amp_params[step_idx],
+                            rf_phase=rf_offset * phase_params[step_idx],
+                            rf_freq=0,
+                            grad_amp=grad_param[step_idx]
+                        )
+                        mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=dtp_rf)
+                        if counter <= self.sim_engine.n_backlog:
+                            self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
+                            current_adc += 1
+
+                    if delay_after_pulse > 0:
+                        self.sim_engine.bm_solver.update_matrix(0, 0, 0)
+                        mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
+                        if counter <= self.sim_engine.n_backlog:
+                            start_time = self.sim_engine.t[-1]
+                            time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
+                            self.sim_engine.t = torch.cat((self.sim_engine.t, time_array))
+                            self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
+                            current_adc += 1
+
+                    rf_counter += 1
+                    grad_counter += 1
+
+                # Nur RF Pulse
+                elif block.rf is not None:
                     if rf_params is None:
                         block.rf.freq_offset = offset if block.rf.freq_offset != 0.0 else 1
                         current_adc, mag = self.sim_engine.run_adc(
@@ -97,7 +150,7 @@ class DifferentiableBMCSimWrapper(nn.Module):
                         _, _, dtp_, delay_after_pulse = prep_rf_simulation(
                             block, self.sim_engine.params.options["max_pulse_samples"]
                         )
-                        rf_offset = offset if block.rf.freq_offset != 0.0 else 0.0
+                        rf_offset = offset if block.rf.freq_offset != 0.0 else 1
                         
                         amp_params, phase_params = rf_params[rf_counter]
                         for step_idx in range(amp_params.numel()):
@@ -115,14 +168,15 @@ class DifferentiableBMCSimWrapper(nn.Module):
                             self.sim_engine.bm_solver.update_matrix(0, 0, 0)
                             mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
                             if counter <= self.sim_engine.n_backlog:
-                                start_time = self.t[-1]
+                                start_time = self.sim_engine.t[-1]
                                 time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_pulse
-                                self.t = torch.cat((self.t, time_array))
+                                self.sim_engine.t = torch.cat((self.sim_engine.t, time_array))
                                 self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
                                 current_adc += 1
                         
                         rf_counter += 1
 
+                # Nur Gradient
                 elif block.gz is not None:
                     if grad_params is None or grad_counter >= len(grad_params):
                         current_adc, mag = self.sim_engine.run_adc(block, current_adc, mag, counter)
@@ -143,9 +197,9 @@ class DifferentiableBMCSimWrapper(nn.Module):
                         self.sim_engine.bm_solver.update_matrix(0, 0, 0)
                         mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=delay_after_grad)
                         if counter <= self.sim_engine.n_backlog:
-                            start_time = self.t[-1]
+                            start_time = self.sim_engine.t[-1]
                             time_array = start_time + torch.arange(1, 2, dtype=torch.float64, device=GLOBAL_DEVICE) * delay_after_grad
-                            self.t = torch.cat((self.t, time_array))
+                            self.sim_engine.t = torch.cat((self.sim_engine.t, time_array))
                             self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
                             current_adc += 1
 
@@ -159,13 +213,16 @@ class DifferentiableBMCSimWrapper(nn.Module):
             _, _, _, _, m_trans = self.sim_engine.get_mag()
             signals.append(m_trans.abs())
 
+            
+        
         difference = torch.max(signals[0] - signals[1])
         return difference
 
 if __name__ == "__main__":
     base_dir = Path(__file__).resolve().parent.parent.parent
     config_file = base_dir / "sim_lib" / "config_1pool.yaml"
-    seq_file = base_dir / "seq_lib" / "RACETE.seq"
+    # seq_file = base_dir / "seq_lib" / "RACETE.seq"
+    seq_file = base_dir / "seq_lib" / "custom_ETM.seq"
 
     if not Path(config_file).exists():
         raise FileNotFoundError(f"File {config_file} not found.")
@@ -230,12 +287,12 @@ if __name__ == "__main__":
     print("Endsignal:", end_signal.item())
     end_signal.backward()
     
-    if rf_parameters is not None:
-        print("\nGradienten für RF:")
-        for i, (amp_tensor, phase_tensor) in enumerate(rf_parameters):
-            print(f"RF Pulse {i}:")
-            print("Amplitude grad:", amp_tensor.grad)
-            print("Phase grad:", phase_tensor.grad)
+    # if rf_parameters is not None:
+    #     print("\nGradienten für RF:")
+    #     for i, (amp_tensor, phase_tensor) in enumerate(rf_parameters):
+    #         print(f"RF Pulse {i}:")
+    #         print("Amplitude grad:", amp_tensor.grad)
+    #         print("Phase grad:", phase_tensor.grad)
     
-    if grad_parameters_tensor is not None:
-        print("\nGradienten für GZ:", grad_parameters_tensor.grad)
+    # if grad_parameters_tensor is not None:
+    #     print("\nGradienten für GZ:", grad_parameters_tensor.grad)

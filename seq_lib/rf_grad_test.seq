@@ -22,16 +22,22 @@ RadiofrequencyRasterTime 1e-06
 TotalDuration 0.004 
 a 90 
 n_ETM 1 
-num_meas 1 
+num_meas 100 
 offsets_ppm 8 
 seq_id_string rf_grad_test 
+delay 0.001
 
 # Format of blocks:
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
 [BLOCKS]
 1 100   0   0   0   0  0  0
 2 200   1   0   0   1  0  0
-3 100   0   0   0   0  1  0
+3 100   0   0   0   0  1   0
+4 180   1   0   0   10 0  0
+5 1000  0   0   0   0  0  0
+6 180   1   0   0   -10 0  0
+7 1000  0   0   0   0  0  0
+8 100   0   0   0   0  1  0
 
 # Format of RF events:
 # id amplitude mag_id phase_id time_shape_id delay freq phase
