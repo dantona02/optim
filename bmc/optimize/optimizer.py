@@ -39,15 +39,14 @@ class DifferentiableBMCSimWrapper(nn.Module):
         - pulse_params: RF-Parameter (Tensor)
         - grad_params: (Optional) Gradient-Parameter (Tensor)
         """
-        rf_block = self.sim_engine.seq.get_block(2)
-        rf_freq_offset = [rf_block.rf.freq_offset, -rf_block.rf.freq_offset]
+    
+        rf_freq_offset = [1, -1]
         signals = []
         
 
         for offset in rf_freq_offset:
             mag = self.reset_simulation()
             current_adc = 1
-            accum_phase = 0.0
             rf_counter = 0
             grad_counter = 0
             
@@ -58,9 +57,9 @@ class DifferentiableBMCSimWrapper(nn.Module):
                 if block.rf is not None:
                     if pulse_params is None:
                         # Falls keine RF-Parameter vorhanden sind, nur run_adc ausführen oder überspringen
-                        block.rf.freq_offset = offset if block.rf.freq_offset != 0.0 else 0.0
-                        current_adc, accum_phase, mag = self.sim_engine.run_adc(
-                            block, current_adc, accum_phase, mag, counter
+                        block.rf.freq_offset = offset if block.rf.freq_offset != 0.0 else 1
+                        current_adc, mag = self.sim_engine.run_adc(
+                            block, current_adc, mag, counter
                         )
                     else:
                         _, ph_, dtp_, delay_after_pulse = prep_rf_simulation(
@@ -68,11 +67,12 @@ class DifferentiableBMCSimWrapper(nn.Module):
                         )
                         rf_offset = offset if block.rf.freq_offset != 0.0 else 0.0
 
+
                         for step_idx in range(pulse_params[rf_counter].numel()):
                             self.sim_engine.bm_solver.update_matrix(
                                 rf_amp=pulse_params[rf_counter][step_idx],
-                                rf_phase=-ph_[step_idx] + block.rf.phase_offset - accum_phase,
-                                rf_freq=rf_offset,
+                                rf_phase=rf_offset * ph_[step_idx],
+                                rf_freq=0,
                             )
                             mag = self.sim_engine.bm_solver.solve_equation(mag=mag, dtp=dtp_)
                             if counter <= self.sim_engine.n_backlog:
@@ -89,15 +89,10 @@ class DifferentiableBMCSimWrapper(nn.Module):
                                 self.sim_engine.m_out[:, :, current_adc] = mag.squeeze()
                                 current_adc += 1
 
-                        phase_degree = dtp_ * pulse_params[rf_counter].numel() * 360 * block.rf.freq_offset
-                        phase_degree %= 360
-                        accum_phase += phase_degree / 180 * torch.pi
-                        rf_counter += 1
-
                 elif block.gz is not None:
                     if grad_params is None or grad_counter >= len(grad_params):
                         # Falls keine passenden Gradient-Parameter vorhanden sind, run_adc
-                        current_adc, accum_phase, mag = self.sim_engine.run_adc(block, current_adc, accum_phase, mag, counter)
+                        current_adc, mag = self.sim_engine.run_adc(block, current_adc, mag, counter)
                         continue
 
                     amp_gz, dtp_gz, delay_after_grad = prep_grad_simulation(
@@ -124,8 +119,8 @@ class DifferentiableBMCSimWrapper(nn.Module):
                     grad_counter += 1
 
                 else:
-                    current_adc, accum_phase, mag = self.sim_engine.run_adc(
-                        block, current_adc, accum_phase, mag, counter
+                    current_adc, mag = self.sim_engine.run_adc(
+                        block, current_adc, mag, counter
                     )
 
             _, _, _, _, m_trans = self.sim_engine.get_mag()
