@@ -7,26 +7,26 @@ from typing import Dict, List, Tuple, Optional
 
 def load_checkpoint(checkpoint_path: str) -> Dict:
     """
-    Lädt einen Checkpoint und gibt die enthaltenen Parameter zurück.
+    Loads a checkpoint and returns its contained parameters.
     
     Args:
-        checkpoint_path: Pfad zum Checkpoint (.pt Datei)
+        checkpoint_path: Path to the checkpoint file (.pt file)
         
     Returns:
-        Dictionary mit den Checkpoint-Daten
+        Dictionary containing the checkpoint data
     """
     checkpoint = torch.load(checkpoint_path)
     return checkpoint
 
 def load_training_history(checkpoint_dir: str) -> List[Dict]:
     """
-    Lädt die Trainingshistorie aus allen Checkpoints.
+    Loads training history from all available checkpoints.
     
     Args:
-        checkpoint_dir: Pfad zum Checkpoint-Verzeichnis
+        checkpoint_dir: Path to the checkpoint directory
         
     Returns:
-        Liste von Dictionaries mit der Trainingshistorie
+        List of dictionaries containing the training history
     """
     checkpoint_dir = Path(checkpoint_dir)
     checkpoint_files = list(checkpoint_dir.glob("checkpoint_epoch_*.pt"))
@@ -42,41 +42,41 @@ def load_training_history(checkpoint_dir: str) -> List[Dict]:
                 'signal': checkpoint['signal']
             })
     
-    # Sortiere nach Epochen
+    # Sort by epoch
     history.sort(key=lambda x: x['epoch'])
     return history
 
 def get_best_checkpoint(checkpoint_dir: str) -> Tuple[str, Dict]:
     """
-    Findet den besten Checkpoint basierend auf dem Loss.
+    Finds the best checkpoint based on the loss value.
     
     Args:
-        checkpoint_dir: Pfad zum Checkpoint-Verzeichnis
+        checkpoint_dir: Path to the checkpoint directory
         
     Returns:
-        Tuple mit Pfad zum besten Checkpoint und dessen Daten
+        Tuple of (path to best checkpoint, checkpoint data)
     """
     best_checkpoint_path = Path(checkpoint_dir) / 'best_checkpoint.pt'
     if not best_checkpoint_path.exists():
-        raise FileNotFoundError(f"Kein best_checkpoint.pt gefunden in {checkpoint_dir}")
+        raise FileNotFoundError(f"No best_checkpoint.pt found in {checkpoint_dir}")
         
     checkpoint = load_checkpoint(str(best_checkpoint_path))
     return str(best_checkpoint_path), checkpoint
 
 def plot_rf_parameters(checkpoint: Dict, pulse_idx: Optional[int] = None):
     """
-    Plottet die RF-Parameter (Amplitude und Phase) aus einem Checkpoint.
+    Plots RF parameters (amplitude and phase) from a checkpoint.
     
     Args:
-        checkpoint: Geladener Checkpoint
-        pulse_idx: Optional, Index des zu plottenden RF-Pulses. 
-                  Wenn None, werden alle Pulse geplottet.
+        checkpoint: Loaded checkpoint data
+        pulse_idx: Optional, index of RF pulse to plot. 
+                  If None, all pulses will be plotted.
     """
     rf_parameters = checkpoint['rf_parameters']
     
     if pulse_idx is not None:
         if pulse_idx >= len(rf_parameters):
-            raise ValueError(f"Pulse index {pulse_idx} außerhalb des gültigen Bereichs")
+            raise ValueError(f"Pulse index {pulse_idx} out of valid range")
         rf_parameters = [rf_parameters[pulse_idx]]
     
     num_pulses = len(rf_parameters)
@@ -105,21 +105,21 @@ def plot_rf_parameters(checkpoint: Dict, pulse_idx: Optional[int] = None):
 
 def plot_gradient_parameters(checkpoint: Dict):
     """
-    Plottet die Gradienten-Parameter aus einem Checkpoint.
+    Plots gradient parameters from a checkpoint.
     
     Args:
-        checkpoint: Geladener Checkpoint
+        checkpoint: Loaded checkpoint data
     """
     grad_parameters = checkpoint['grad_parameters']
     
     if grad_parameters is None:
-        print("Keine Gradienten-Parameter im Checkpoint gefunden")
+        print("No gradient parameters found in checkpoint")
         return
         
-    # Konvertiere zu numpy für das Plotting
+    # Convert to numpy for plotting
     grad_parameters = grad_parameters.numpy()
     
-    # Plot für jeden Gradienten
+    # Plot for each gradient
     num_gradients = grad_parameters.shape[0]
     fig, axes = plt.subplots(num_gradients, 1, figsize=(12, 4*num_gradients))
     if num_gradients == 1:
@@ -137,15 +137,15 @@ def plot_gradient_parameters(checkpoint: Dict):
 
 def plot_training_progress(checkpoint_dir: str):
     """
-    Plottet den Trainingsverlauf basierend auf den Checkpoint-Historie.
+    Plots training progress based on checkpoint history.
     
     Args:
-        checkpoint_dir: Pfad zum Checkpoint-Verzeichnis
+        checkpoint_dir: Path to the checkpoint directory
     """
     history = load_training_history(checkpoint_dir)
     
     if not history:
-        raise ValueError("Keine Checkpoints gefunden")
+        raise ValueError("No checkpoints found")
     
     epochs = [entry['epoch'] for entry in history]
     losses = [entry['loss'] for entry in history]
@@ -169,24 +169,24 @@ def plot_training_progress(checkpoint_dir: str):
     plt.show()
 
 if __name__ == "__main__":
-    # Beispiel für die Verwendung
+    # Example usage
     checkpoint_dir = "checkpoints"
     
-    # Lade und zeige Trainingsverlauf
+    # Load and show training progress
     print("Plotting training progress...")
     plot_training_progress(checkpoint_dir)
     
-    # Lade besten Checkpoint
+    # Load best checkpoint
     print("\nLoading best checkpoint...")
     best_checkpoint_path, best_checkpoint = get_best_checkpoint(checkpoint_dir)
     print(f"Best checkpoint from epoch {best_checkpoint['epoch']}")
     print(f"Loss: {best_checkpoint['loss']}")
     print(f"Signal: {best_checkpoint['signal']}")
     
-    # Plotte RF-Parameter des besten Checkpoints
+    # Plot RF parameters from best checkpoint
     print("\nPlotting RF parameters...")
     plot_rf_parameters(best_checkpoint)
     
-    # Plotte Gradienten-Parameter
+    # Plot gradient parameters
     print("\nPlotting gradient parameters...")
     plot_gradient_parameters(best_checkpoint)

@@ -13,20 +13,39 @@ from bmc.utils.global_device import GLOBAL_DEVICE
 import matplotlib.pyplot as plt
 
 def l2_loss_function(signal_diff):
+    """
+    Calculates L2 loss for the signal difference.
+    
+    Args:
+        signal_diff: Signal difference tensor
+        
+    Returns:
+        Negative L2 norm of the signal difference
+    """
     return -torch.norm(signal_diff, p=2)
 
 def save_checkpoint(checkpoint_dir, rf_parameters, grad_parameters, optimizer, epoch, loss, signal, 
                    checkpoint_name=None):
     """
-    Speichert einen Checkpoint mit allen relevanten Trainingsparametern
+    Saves a checkpoint with all relevant training parameters.
+    
+    Args:
+        checkpoint_dir: Directory for storing checkpoints
+        rf_parameters: RF pulse parameters (amplitude and phase)
+        grad_parameters: Gradient parameters
+        optimizer: Current optimizer state
+        epoch: Current epoch number
+        loss: Current loss value
+        signal: Current signal value
+        checkpoint_name: Optional custom name for the checkpoint file
     """
     if checkpoint_name is None:
         checkpoint_name = f"checkpoint_epoch_{epoch}.pt"
     
-    # Erstelle Checkpoint-Verzeichnis falls nicht vorhanden
+    # Create checkpoint directory if it doesn't exist
     os.makedirs(checkpoint_dir, exist_ok=True)
     
-    # Bereite RF-Parameter für Speicherung vor
+    # Prepare RF parameters for storage
     rf_state = []
     if rf_parameters:
         for amp, phase in rf_parameters:
@@ -35,10 +54,10 @@ def save_checkpoint(checkpoint_dir, rf_parameters, grad_parameters, optimizer, e
                 'phase': phase.detach()
             })
     
-    # Bereite Gradienten-Parameter für Speicherung vor
+    # Prepare gradient parameters for storage
     grad_state = grad_parameters.detach() if grad_parameters is not None else None
     
-    # Erstelle Checkpoint-Dictionary
+    # Create checkpoint dictionary
     checkpoint = {
         'epoch': epoch,
         'rf_parameters': rf_state,
@@ -48,11 +67,11 @@ def save_checkpoint(checkpoint_dir, rf_parameters, grad_parameters, optimizer, e
         'signal': signal
     }
     
-    # Speichere Checkpoint
+    # Save checkpoint
     checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
     torch.save(checkpoint, checkpoint_path)
     
-    # Speichere zusätzliche Metadaten
+    # Save additional metadata
     metadata = {
         'timestamp': datetime.now().isoformat(),
         'epoch': epoch,
@@ -65,14 +84,21 @@ def save_checkpoint(checkpoint_dir, rf_parameters, grad_parameters, optimizer, e
 
 def load_checkpoint(checkpoint_path, optimizer=None):
     """
-    Lädt einen Checkpoint und stellt den Trainingszustand wieder her
+    Loads a checkpoint and restores the training state.
+    
+    Args:
+        checkpoint_path: Path to the checkpoint file
+        optimizer: Optional optimizer to load state into
+        
+    Returns:
+        Tuple of (rf_parameters, grad_parameters, epoch, loss, signal)
     """
     if not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"Checkpoint nicht gefunden: {checkpoint_path}")
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     
     checkpoint = torch.load(checkpoint_path)
     
-    # Erstelle neue Parameter-Listen
+    # Create new parameter lists
     rf_parameters = []
     if checkpoint['rf_parameters']:
         for rf_state in checkpoint['rf_parameters']:
@@ -84,13 +110,19 @@ def load_checkpoint(checkpoint_path, optimizer=None):
     if checkpoint['grad_parameters'] is not None:
         grad_parameters = checkpoint['grad_parameters'].requires_grad_(True)
     
-    # Lade Optimizer-Zustand falls vorhanden
+    # Load optimizer state if provided
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
     return rf_parameters, grad_parameters, checkpoint['epoch'], checkpoint['loss'], checkpoint['signal']
 
 def get_params():
+    """
+    Initializes and returns all necessary parameters for training.
+    
+    Returns:
+        Tuple of (rf_parameters, grad_parameters_tensor, sim_params, seq_file, z_pos)
+    """
     base_dir = Path(__file__).resolve().parent.parent.parent
     config_file = base_dir / "sim_lib" / "config_1pool.yaml"
     seq_file = base_dir / "seq_lib" / "RACETE.seq"
@@ -159,14 +191,17 @@ def get_params():
 def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints', 
           checkpoint_frequency=10, resume_from=None):
     """
-    Training mit Checkpoint-Unterstützung
+    Training with checkpoint support.
     
     Args:
-        num_epochs: Anzahl der Trainings-Epochen
-        learning_rate: Lernrate für den Optimizer
-        checkpoint_dir: Verzeichnis für Checkpoints
-        checkpoint_frequency: Speicherintervall für Checkpoints (in Epochen)
-        resume_from: Optional, Pfad zu einem Checkpoint zum Fortsetzen des Trainings
+        num_epochs: Number of training epochs
+        learning_rate: Learning rate for optimizer
+        checkpoint_dir: Directory for storing checkpoints
+        checkpoint_frequency: Checkpoint saving frequency in epochs
+        resume_from: Optional path to checkpoint for resuming training
+        
+    Returns:
+        Tuple of (optimized_rf_parameters, optimized_gradient_parameters)
     """
     # Initialisiere Parameter und Optimizer
     if resume_from is None:
@@ -278,9 +313,9 @@ def train(num_epochs=50, learning_rate=0.1, checkpoint_dir='checkpoints',
     return rf_parameters, grad_parameters_tensor
 
 if __name__ == "__main__":
-    # Beispiel für Training mit Checkpoint-Unterstützung
+    # Example for training with checkpoint support
     rf_params_optimized, grad_params_optimized = train(
-        num_epochs=15,
+        num_epochs=50,
         checkpoint_frequency=5,
-        # resume_from='checkpoints/checkpoint_epoch_20.pt'  # Optional zum Fortsetzen
+        # resume_from='checkpoints/checkpoint_epoch_20.pt'  # Optional for resuming
     )

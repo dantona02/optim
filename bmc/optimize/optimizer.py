@@ -12,16 +12,22 @@ from pathlib import Path
 class DifferentiableBMCSimWrapper(nn.Module):
     def __init__(self, sim_engine: BMCSim):
         """
-        sim_engine: Eine Instanz deiner BMCSim-Klasse, die den kompletten Simulationsablauf kapselt.
-                    (Sie enthält z. B. Attribute wie m_init, t, seq, bm_solver, dt_adc usw.)
+        Initialize the differentiable wrapper for BMC simulation.
+
+        Args:
+            sim_engine: Instance of BMCSim class that encapsulates the complete simulation process.
+                       (Contains attributes like m_init, t, seq, bm_solver, dt_adc etc.)
         """
         super(DifferentiableBMCSimWrapper, self).__init__()
         self.sim_engine = sim_engine
 
     def reset_simulation(self):
         """
-        Setzt den Simulationszustand zurück.
-        Wir nehmen an, dass self.sim_engine.m_init als NumPy‑Array oder Tensor vorliegt.
+        Reset the simulation state.
+        Assumes self.sim_engine.m_init is provided as NumPy array or tensor.
+        
+        Returns:
+            Initial magnetization tensor
         """
         mag = torch.tensor(
             self.sim_engine.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
@@ -35,9 +41,14 @@ class DifferentiableBMCSimWrapper(nn.Module):
 
     def forward(self, rf_params=None, grad_params=None):
         """
-        Extended Forward Pass:
-        - rf_params: List of [amplitude_tensor, phase_tensor] for each RF pulse
-        - grad_params: (Optional) Gradient parameters (Tensor)
+        Extended Forward Pass for BMC simulation.
+        
+        Args:
+            rf_params: List of [amplitude_tensor, phase_tensor] for each RF pulse
+            grad_params: (Optional) Gradient parameters (Tensor)
+            
+        Returns:
+            Difference between positive and negative frequency offset signals
         """
         rf_freq_offset = [1, -1]
         signals = []
