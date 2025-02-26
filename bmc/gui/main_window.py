@@ -409,13 +409,13 @@ class BMCSimulatorGUI(QMainWindow):
         self.setWindowTitle("BMC Simulator")
         self.setGeometry(100, 100, 1400, 800)
         
-        # Initialisierung der wichtigen Variablen
+        # Initialize important variables
         self.sim_engine = None
         self.current_config = None
         self.current_seq = None
-        self.config_params = {}  # Initialisiere config_params
+        self.config_params = {}
         
-        # Default-Konfigurationswerte laden
+        # Load default configuration values
         self._load_default_config()
         
         # Set the modern dark theme
@@ -590,125 +590,60 @@ class BMCSimulatorGUI(QMainWindow):
         param_group.addLayout(param_layout)
         layout.addWidget(param_group)
         
-        # Zusätzlicher Tab für komplette Konfiguration
-        config_tab = QTabWidget()
-        config_tab.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #383838;
-                border-radius: 6px;
-                padding: 5px;
-            }
-            QTabBar::tab {
-                background-color: #2D2D2D;
-                color: #E0E0E0;
-                padding: 8px 16px;
-                margin-right: 4px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-            }
-            QTabBar::tab:selected {
-                background-color: #383838;
-                color: #2962FF;
-            }
-            QTabBar::tab:hover:!selected {
-                background-color: #333333;
-                color: #FFFFFF;
-            }
-        """)
-        
-        # Tab für Wasserpool-Params
-        water_tab = self._create_water_pool_tab()
-        config_tab.addTab(water_tab, "Wasserpool")
-        
-        # Tab für CEST-Pool-Params
-        cest_tab = self._create_cest_pool_tab()
-        config_tab.addTab(cest_tab, "CEST-Pool")
-        
-        # Tab für Scanner-Einstellungen
-        scanner_tab = self._create_scanner_tab()
-        config_tab.addTab(scanner_tab, "Scanner")
-        
-        # Tab für erweiterte Einstellungen
-        advanced_tab = self._create_advanced_tab()
-        config_tab.addTab(advanced_tab, "Erweitert")
-        
-        # Configuration Group für den Tab
-        config_group = TitledGroupBox("Konfiguration")
+        # Configuration Group with button to open dialog
+        config_group = TitledGroupBox("Configuration")
         config_layout = QVBoxLayout()
-        config_layout.addWidget(config_tab)
         
-        # Buttons für die Konfiguration
-        config_btn_layout = QHBoxLayout()
+        # Button to open configuration dialog
+        config_btn = QPushButton("Edit Configuration")
+        config_btn.clicked.connect(self._open_config_dialog)
+        config_layout.addWidget(config_btn)
         
-        # Button zum Laden einer vorhandenen Konfiguration
-        self.load_existing_config_btn = QPushButton("Konfig laden")
-        self.load_existing_config_btn.setFixedWidth(120)
-        self.load_existing_config_btn.clicked.connect(self._load_config)
-        config_btn_layout.addWidget(self.load_existing_config_btn)
-        
-        # Button zum Speichern der aktuellen Konfiguration
-        self.save_config_btn = QPushButton("Konfig speichern")
-        self.save_config_btn.setFixedWidth(120)
-        self.save_config_btn.clicked.connect(self._save_config)
-        config_btn_layout.addWidget(self.save_config_btn)
-        
-        # Button zum Zurücksetzen auf Standardwerte
-        self.reset_config_btn = QPushButton("Zurücksetzen")
-        self.reset_config_btn.setFixedWidth(120)
-        self.reset_config_btn.clicked.connect(self._reset_config)
-        config_btn_layout.addWidget(self.reset_config_btn)
-        
-        config_layout.addLayout(config_btn_layout)
         config_group.addLayout(config_layout)
         layout.addWidget(config_group)
         
         # Simulation Control Group
         control_group = TitledGroupBox("Control")
         control_layout = QVBoxLayout()
-        control_layout.setSpacing(24)  # Erhöht den Abstand zwischen Elementen
+        control_layout.setSpacing(24)
         
         # Start Button
         self.start_btn = QPushButton("Start Simulation")
         self.start_btn.clicked.connect(self._run_simulation)
         self.start_btn.setEnabled(False)
-        self.start_btn.setFixedHeight(40)  # Höherer Button für bessere Sichtbarkeit
+        self.start_btn.setFixedHeight(40)
         control_layout.addWidget(self.start_btn)
         
-        # Progress Widget with Status - mehr Platz ohne Rahmen
-        progress_widget = QWidget()
-        progress_widget.setStyleSheet("background: transparent; border: none;") # Entfernt den Rahmen
-        progress_layout = QVBoxLayout(progress_widget)
-        progress_layout.setSpacing(16)  # Mehr Abstand zwischen Progressbar und Label
-        progress_layout.setContentsMargins(0, 8, 0, 8)  # Mehr Platz oben und unten
-        
-        # Verbesserte Progress Bar - mit abgestimmtem Hintergrund und sanft abgerundeten Ecken
-        self.progress = AnimatedProgressBar()
-        self.progress.setFixedHeight(25)  # Dickere Progress Bar
-        self.progress.setTextVisible(True)  # Text auf der Progressbar anzeigen
-        self.progress.setStyleSheet("""
+        # Progress Bar Styling
+        progress_style = """
             QProgressBar {
                 border: none;
-                background-color: #1E1E1E;
-                min-height: 25px;
-                text-align: center;
-                color: white;
-                font-weight: bold;
-                font-size: 13px;
-                margin: 0px;
-                border-radius: 8px;
-                padding: 0px;
+                background-color: #2A2A2A;
+                min-height: 6px;
+                max-height: 6px;
+                border-radius: 3px;
+                margin: 12px 0px;
             }
             
             QProgressBar::chunk {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                                              stop:0 #2E7D32, stop:0.5 #43A047, stop:1 #66BB6A);
-                border-radius: 8px;
-                margin: 0px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                          stop:0 #4CAF50, stop:1 #81C784);
+                border-radius: 3px;
             }
-        """)
+        """
+        
+        # Progress Widget
+        progress_widget = QWidget()
+        progress_widget.setStyleSheet(progress_style)
+        progress_layout = QVBoxLayout(progress_widget)
+        progress_layout.setSpacing(16)
+        progress_layout.setContentsMargins(0, 8, 0, 8)
+        
+        self.progress = AnimatedProgressBar()
+        self.progress.setFixedHeight(25)
+        self.progress.setTextVisible(True)
         progress_layout.addWidget(self.progress)
         
-        # Status Label unter Progress Bar mit mehr Abstand
         self.status_label = QLabel("")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("""
@@ -721,7 +656,7 @@ class BMCSimulatorGUI(QMainWindow):
                 background-color: transparent;
             }
         """)
-        self.status_label.setMinimumHeight(40)  # Feste Höhe für das Label
+        self.status_label.setMinimumHeight(40)
         progress_layout.addWidget(self.status_label)
         
         control_layout.addWidget(progress_widget)
@@ -740,7 +675,17 @@ class BMCSimulatorGUI(QMainWindow):
         
         # Add stretch at the end
         layout.addStretch()
-        
+
+    def _open_config_dialog(self):
+        """Öffnet den Konfigurations-Dialog"""
+        from bmc.gui.config_dialog import ConfigDialog
+        dialog = ConfigDialog(self.config_params, self)
+        if dialog.exec():
+            # Wenn OK geklickt wurde, aktualisiere die Konfiguration
+            self.config_params = dialog.get_config()
+            # Zeige an, dass dynamische Konfiguration verwendet wird
+            self.config_label.setText("Dynamic configuration")
+
     def _setup_plots(self, layout):
         # Create tabs for different plots
         tabs = QTabWidget()
@@ -804,7 +749,7 @@ class BMCSimulatorGUI(QMainWindow):
             
     def _run_simulation(self):
         if not self.current_seq:
-            QMessageBox.warning(self, "Fehlende Daten", "Bitte laden Sie eine Sequenzdatei.")
+            QMessageBox.warning(self, "Missing Data", "Please load a sequence file.")
             return
             
         # Temporäre YAML-Datei erstellen
@@ -820,7 +765,7 @@ class BMCSimulatorGUI(QMainWindow):
         try:
             sim_params = load_params(temp_config_path)
         except (AssertionError, AttributeError) as e:
-            QMessageBox.critical(self, "Ungültige Parameter", f"Fehler in den Parametern: {str(e)}")
+            QMessageBox.critical(self, "Invalid Parameters", f"Error in parameters: {str(e)}")
             return
             
         # Prepare z-positions
@@ -836,7 +781,16 @@ class BMCSimulatorGUI(QMainWindow):
         self.load_seq_btn.setEnabled(False)
         self.load_config_btn.setEnabled(False)
         self.status_label.setText("Simulation running...")
-        self.status_label.setStyleSheet("color: #42a5f5; font-weight: 600; padding: 5px;")
+        self.status_label.setStyleSheet("""
+            QLabel {
+                color: #42a5f5;
+                font-weight: 600;
+                padding: 10px;
+                margin-top: 8px;
+                font-size: 13px;
+                background-color: transparent;
+            }
+        """)
         
         try:
             # Initialize simulation engine
