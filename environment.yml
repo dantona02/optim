@@ -1,15 +1,24 @@
 name: bmc
 channels:
-  - conda-forge
   - defaults
+  - conda-forge
 dependencies:
   - python=3.11
   - numpy
+  - scipy
+  - matplotlib
+  - torch
+  - tqdm
+  - ipykernel
+  - jupyter
+  - pyyaml
+  - pyqt6
   - pip
   - pip:
-      - pypulseq
-      - jupyterlab
-      - ipywidgets
-      - torch
-      - torchvision
-      - torchaudio
+    - manim
+    - pypulseq
+    - jupyterlab
+    - ipywidgets
+    - torch
+    - torchvision
+    - torchaudio
