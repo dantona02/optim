@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QComboBox, QSpinBox,
     QDoubleSpinBox, QProgressBar, QTabWidget, QGroupBox, QStyleFactory,
-    QFrame, QCheckBox, QMessageBox, QInputDialog
+    QFrame, QCheckBox, QMessageBox, QInputDialog, QScrollArea
 )
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QPalette, QColor, QFont, QIcon
@@ -245,7 +245,8 @@ class TitledGroupBox(QWidget):
         down_arrow_url = f"{down_arrow_path.as_posix()}"
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 22, 0, 0)  # More space for the modern floating title
+        # Füge einen kleinen Abstand (5px) nach links hinzu, behalte den Rest bei 0
+        layout.setContentsMargins(5, 22, 0, 0)
         layout.setSpacing(8)
 
         # Modern floating title label
@@ -264,7 +265,8 @@ class TitledGroupBox(QWidget):
         title_container = QWidget()
         title_container.setStyleSheet("background: transparent; border: none;")
         title_layout = QHBoxLayout(title_container)
-        title_layout.setContentsMargins(16, 0, 0, 0)
+        # Entferne den linken Margin (16px) im title_layout
+        title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.addWidget(self.title_label)
         title_layout.addStretch()
         
@@ -276,6 +278,14 @@ class TitledGroupBox(QWidget):
                                           stop:0 #2A2A2A, stop:1 #2D2D2D);
                 border: 1px solid #383838;
                 border-radius: 8px;
+            }}
+            
+            /* Modernized styling without box-shadow */
+            QWidget {{
+                border: none;  /* Entferne den Standard-Rahmen */
+                background-color: #2A2A2A;
+                border-radius: 8px;
+                border: 2px solid #303030;  /* Dunklerer Rand statt Schatten */
             }}
             
             QPushButton {{
@@ -391,11 +401,26 @@ class TitledGroupBox(QWidget):
         """)
         
         self.box_layout = QVBoxLayout(self.box)
-        self.box_layout.setContentsMargins(16, 16, 16, 16)
-        self.box_layout.setSpacing(12)
+        self.box_layout.setContentsMargins(12, 12, 12, 12)  # Balanced padding
+        self.box_layout.setSpacing(10)
 
         layout.addWidget(title_container)
         layout.addWidget(self.box)
+        
+        # Entferne die Zentrierung der Box, die eine Hauptursache für den Abstand ist
+        # Stattdessen links ausrichten (AlignLeft)
+        layout.setAlignment(self.box, Qt.AlignmentFlag.AlignLeft)
+        
+    # Überschreibe die resizeEvent-Methode, um die dynamische Breite anzupassen
+    def resizeEvent(self, event):
+        # Berechne die Box-Breite als relativen Wert zur Container-Breite
+        # Lasse einen kleinen Rand (5px) zu den Seiten
+        container_width = self.width()
+        box_width = container_width - 20  # 5px Abstand nach rechts
+        self.box.setFixedWidth(box_width)
+        
+        # Rufe die übergeordnete Methode auf
+        super().resizeEvent(event)
 
     def addWidget(self, widget):
         self.box_layout.addWidget(widget)
@@ -407,7 +432,21 @@ class BMCSimulatorGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("BMC Simulator")
-        self.setGeometry(100, 100, 1400, 800)
+        
+        # Get the available screen geometry
+        screen = QApplication.primaryScreen().availableGeometry()
+        
+        # Set reasonable default size
+        width = int(screen.width() * 0.7)  # 70% of screen width
+        height = int(screen.height() * 0.7)  # 70% of screen height
+        
+        # Set minimum size to maintain usability
+        self.setMinimumSize(900, 600)
+        
+        # Center the window on screen
+        x = (screen.width() - width) // 2
+        y = (screen.height() - height) // 2
+        self.setGeometry(x, y, width, height)
         
         # Initialize important variables
         self.sim_engine = None
@@ -420,7 +459,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # Set the modern dark theme
         self.setStyleSheet("""
-            QMainWindow {
+            QMainWindow, QScrollArea, QWidget {
                 background-color: #1E1E1E;
             }
             QWidget {
@@ -452,27 +491,79 @@ class BMCSimulatorGUI(QMainWindow):
             }
         """)
         
-        # Hauptwidget und Layout
+        # Main widget and layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QHBoxLayout(main_widget)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
         
-        # Linkes Panel für Kontrollelemente
+        # Left panel for controls with ScrollArea and fixed width
+        control_container = QWidget()
+        control_container.setFixedWidth(420)  # Breite für das Control Panel
+        layout.addWidget(control_container)
+        
+        control_layout = QVBoxLayout(control_container)
+        control_layout.setContentsMargins(0, 0, 0, 0)  # Entferne alle Ränder im Control Container
+        control_layout.setSpacing(0)
+        
+        control_scroll = QScrollArea()
+        control_scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: #1E1E1E;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #2A2A2A;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #3E3E3E;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+                border: none;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+        control_scroll.setWidgetResizable(True)
+        control_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        control_layout.addWidget(control_scroll)
+        
+        # Container for actual control widgets
         control_panel = QWidget()
-        control_layout = QVBoxLayout(control_panel)
-        control_panel.setFixedWidth(400)  # Kontrollpanel breiter gemacht
-        layout.addWidget(control_panel)
+        control_panel.setObjectName("controlPanel")
+        control_panel.setStyleSheet("#controlPanel { background-color: #1E1E1E; }")
+        control_scroll.setWidget(control_panel)
         
-        # Rechtes Panel für Plots
+        control_panel_layout = QVBoxLayout(control_panel)
+        control_panel_layout.setSpacing(16)
+        control_panel_layout.setContentsMargins(10, 0, 10, 20)  # Gleiche Randabstände links und rechts (10px)
+        
+        # Right panel for plots
         plot_panel = QWidget()
         plot_layout = QVBoxLayout(plot_panel)
+        plot_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(plot_panel)
         
-        # Setup der Kontrollelemente
-        self._setup_controls(control_layout)
-        
-        # Setup der Plot-Bereiche
+        # Setup controls and plots
+        self._setup_controls(control_panel_layout)
         self._setup_plots(plot_layout)
+        
+        # Make sure the plot panel expands while control panel stays fixed
+        layout.setStretch(0, 0)  # Control panel - no stretch
+        layout.setStretch(1, 1)  # Plot panel - should stretch
         
         # Initialisierung der Simulation
         self.sim_engine = None
@@ -522,8 +613,15 @@ class BMCSimulatorGUI(QMainWindow):
         seq_layout.setSpacing(12)
         self.seq_label = QLabel("No sequence loaded")
         self.seq_label.setMinimumWidth(200)
-        self.load_seq_btn = QPushButton("Load Sequence")
-        self.load_seq_btn.setFixedWidth(150)
+        self.load_seq_btn = QPushButton("Load Sequence")  # Kürzerer Text
+        self.load_seq_btn.setFixedWidth(70)  # Noch schmaler: von 90px auf 70px
+        # Überschreibe das globale Stylesheet für diesen Button
+        self.load_seq_btn.setStyleSheet("""
+            QPushButton {
+                min-width: 100px;
+                padding: 6px 10px;
+            }
+        """)
         self.load_seq_btn.clicked.connect(self._load_sequence)
         seq_layout.addWidget(self.seq_label)
         seq_layout.addWidget(self.load_seq_btn)
@@ -535,8 +633,15 @@ class BMCSimulatorGUI(QMainWindow):
         config_layout.setSpacing(12)
         self.config_label = QLabel("No config loaded")
         self.config_label.setMinimumWidth(200)
-        self.load_config_btn = QPushButton("Load Config")
-        self.load_config_btn.setFixedWidth(150)
+        self.load_config_btn = QPushButton("Load Config")  # Kürzerer Text
+        self.load_config_btn.setFixedWidth(70)  # Noch schmaler: von 90px auf 70px
+        # Überschreibe das globale Stylesheet für diesen Button
+        self.load_config_btn.setStyleSheet("""
+            QPushButton {
+                min-width: 100px;
+                padding: 6px 10px;
+            }
+        """)
         self.load_config_btn.clicked.connect(self._load_config)
         config_layout.addWidget(self.config_label)
         config_layout.addWidget(self.load_config_btn)
@@ -553,7 +658,7 @@ class BMCSimulatorGUI(QMainWindow):
         # ADC Time
         adc_layout = QHBoxLayout()
         adc_layout.setSpacing(12)
-        adc_label = QLabel("ADC Time (ms):")
+        adc_label = QLabel("ADC Time [ms]:")
         adc_label.setFixedWidth(150)
         self.adc_time = QDoubleSpinBox()
         self.adc_time.setRange(0.1, 100.0)
@@ -614,36 +719,35 @@ class BMCSimulatorGUI(QMainWindow):
         self.start_btn.setFixedHeight(40)
         control_layout.addWidget(self.start_btn)
         
-        # Progress Bar Styling
-        progress_style = """
+        # Breitere und dickere Progress Bar mit Text direkt in der Bar und stärkerem Farbübergang
+        self.progress = AnimatedProgressBar()
+        self.progress.setFixedHeight(28)  # Noch höhere Progress Bar: von 20px auf 28px
+        self.progress.setTextVisible(True)  # Text in der Bar anzeigen
+        self.progress.setFormat("%v/%m (%p%)")
+        self.progress.setStyleSheet("""
             QProgressBar {
                 border: none;
-                background-color: #2A2A2A;
-                min-height: 6px;
-                max-height: 6px;
-                border-radius: 3px;
-                margin: 12px 0px;
+                background-color: #242424;  /* Dunklerer Hintergrund für besseren Kontrast */
+                min-height: 28px;
+                max-height: 28px;
+                border-radius: 14px;
+                margin: 8px 0px;
+                text-align: center;
+                color: white;
+                font-weight: 600;
+                font-size: 13px;
+                border: 2px solid #333333;  /* Zusätzlicher Rahmen für mehr 3D-Effekt */
             }
             
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                                          stop:0 #4CAF50, stop:1 #81C784);
-                border-radius: 3px;
+                                          stop:0 #0AC18E, stop:0.3 #22E09A, stop:1 #4ADE80);  /* Stärkerer Farbverlauf */
+                border-radius: 12px;  /* Angepasst für größere Höhe */
             }
-        """
+        """)
+        control_layout.addWidget(self.progress)
         
-        # Progress Widget
-        progress_widget = QWidget()
-        progress_widget.setStyleSheet(progress_style)
-        progress_layout = QVBoxLayout(progress_widget)
-        progress_layout.setSpacing(16)
-        progress_layout.setContentsMargins(0, 8, 0, 8)
-        
-        self.progress = AnimatedProgressBar()
-        self.progress.setFixedHeight(25)
-        self.progress.setTextVisible(True)
-        progress_layout.addWidget(self.progress)
-        
+        # Status Label (kein "Ready" mehr)
         self.status_label = QLabel("")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("""
@@ -657,9 +761,8 @@ class BMCSimulatorGUI(QMainWindow):
             }
         """)
         self.status_label.setMinimumHeight(40)
-        progress_layout.addWidget(self.status_label)
+        control_layout.addWidget(self.status_label)
         
-        control_layout.addWidget(progress_widget)
         control_group.addLayout(control_layout)
         layout.addWidget(control_group)
         
@@ -782,15 +885,16 @@ class BMCSimulatorGUI(QMainWindow):
         self.load_config_btn.setEnabled(False)
         self.status_label.setText("Simulation running...")
         self.status_label.setStyleSheet("""
-            QLabel {
-                color: #42a5f5;
-                font-weight: 600;
-                padding: 10px;
-                margin-top: 8px;
-                font-size: 13px;
-                background-color: transparent;
-            }
-        """)
+                QLabel {
+                    color: #42a5f5; 
+                    font-weight: 600; 
+                    padding-top: 0px;    /* Weniger Padding oben */
+                    padding-bottom: 20px;  /* Mehr Padding unten */
+                    padding-left: 5px;
+                    padding-right: 5px;
+                }
+            """)
+        
         
         try:
             # Initialize simulation engine
@@ -829,8 +933,7 @@ class BMCSimulatorGUI(QMainWindow):
                 
                 # Update status text periodically
                 if i % 10 == 0 or i == total_events:
-                    percent = int((i / total_events) * 100)
-                    self.status_label.setText(f"Running simulation... {percent}%")
+                    self.status_label.setText(f"Running simulation...")
                 
                 QApplication.processEvents()
             
@@ -841,7 +944,17 @@ class BMCSimulatorGUI(QMainWindow):
             self._plot_results()
             
             self.status_label.setText("Simulation completed successfully")
-            self.status_label.setStyleSheet("color: #4caf50; font-weight: 600; padding: 5px;")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #4caf50; 
+                    font-weight: 600; 
+                    padding-top: 0px;    /* Weniger Padding oben */
+                    padding-bottom: 20px;  /* Mehr Padding unten */
+                    padding-left: 5px;
+                    padding-right: 5px;
+                }
+            """)
+            # self.status_label.setStyleSheet("color: #4caf50; font-weight: 600; padding: 5px;")
             self.save_btn.setEnabled(True)
             
         except Exception as e:
@@ -888,7 +1001,7 @@ class BMCSimulatorGUI(QMainWindow):
         # for t_slice, m_slice in zip(time_slices, magnetization_slices):
         #     if 'adc at' in self.sim_engine.events[len(self.sim_engine.events)-1]:  # Prüfe ob es sich um ADC-Daten handelt
         #         ax.plot(t_slice[-1].cpu().numpy(), abs(m_slice[-1].cpu().numpy()), 'b.', label='ADC')
-        ax.set_xlabel('Time (s)')
+        ax.set_xlabel('Time [s]')
         ax.set_ylabel('Magnetization')
         ax.grid(True)
         ax.legend()
@@ -903,7 +1016,7 @@ class BMCSimulatorGUI(QMainWindow):
         # for t_slice, m_slice in zip(time_slices, magnetization_slices):
         #     if 'adc at' in self.sim_engine.events[len(self.sim_engine.events)-1]:  # Prüfe ob es sich um ADC-Daten handelt
         #         ax.plot(t_slice.cpu().numpy(), np.angle(m_slice.cpu().numpy()), 'r.', label='ADC')
-        ax.set_xlabel('Time (s)')
+        ax.set_xlabel('Time [s]')
         ax.set_ylabel('Phase (rad)')
         ax.grid(True)
         ax.legend()
@@ -918,7 +1031,7 @@ class BMCSimulatorGUI(QMainWindow):
         # for t_slice, m_slice in zip(time_slices, magnetization_slices):
         #     if 'adc at' in self.sim_engine.events[len(self.sim_engine.events)-1]:  # Prüfe ob es sich um ADC-Daten handelt
         #         ax.plot(t_slice.cpu().numpy(), abs(m_slice.cpu().numpy()).real, 'g.', label='ADC')
-        ax.set_xlabel('Time (s)')
+        ax.set_xlabel('Time [s]')
         ax.set_ylabel('Z-Magnetization')
         ax.grid(True)
         ax.legend()
@@ -972,7 +1085,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # T1
         t1_layout = QHBoxLayout()
-        t1_label = QLabel("T1 (s):")
+        t1_label = QLabel("T1 [s]:")
         t1_label.setFixedWidth(150)
         self.water_t1 = QDoubleSpinBox()
         self.water_t1.setRange(0.1, 10.0)
@@ -985,7 +1098,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # T2
         t2_layout = QHBoxLayout()
-        t2_label = QLabel("T2 (s):")
+        t2_label = QLabel("T2 [s]:")
         t2_label.setFixedWidth(150)
         self.water_t2 = QDoubleSpinBox()
         self.water_t2.setRange(0.001, 5.0)
@@ -1047,7 +1160,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # T1
         t1_layout = QHBoxLayout()
-        t1_label = QLabel("T1 (s):")
+        t1_label = QLabel("T1 [s]:")
         t1_label.setFixedWidth(150)
         self.cest_t1 = QDoubleSpinBox()
         self.cest_t1.setRange(0.1, 10.0)
@@ -1059,7 +1172,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # T2
         t2_layout = QHBoxLayout()
-        t2_label = QLabel("T2 (s):")
+        t2_label = QLabel("T2 [s]:")
         t2_label.setFixedWidth(150)
         self.cest_t2 = QDoubleSpinBox()
         self.cest_t2.setRange(0.001, 5.0)
@@ -1072,7 +1185,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # k - Austauschrate
         k_layout = QHBoxLayout()
-        k_label = QLabel("Austauschrate (k) [Hz]:")
+        k_label = QLabel("Austauschrate k [Hz]:")
         k_label.setFixedWidth(150)
         self.cest_k = QDoubleSpinBox()
         self.cest_k.setRange(0, 1000)
@@ -1084,7 +1197,7 @@ class BMCSimulatorGUI(QMainWindow):
         
         # dw - Chemische Verschiebung
         dw_layout = QHBoxLayout()
-        dw_label = QLabel("Chem. Verschiebung (dw) [ppm]:")
+        dw_label = QLabel(r"Chem. Verschiebung $d\omega$ [ppm]:")
         dw_label.setFixedWidth(150)
         self.cest_dw = QDoubleSpinBox()
         self.cest_dw.setRange(-10, 10)

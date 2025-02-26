@@ -277,7 +277,7 @@ class ConfigDialog(QDialog):
         
         # T1
         t1_layout = QHBoxLayout()
-        t1_label = QLabel("T1 (s):")
+        t1_label = QLabel("T1 [s]:")
         t1_label.setFixedWidth(150)
         self.water_t1 = QDoubleSpinBox()
         self.water_t1.setRange(0.1, 10.0)
@@ -290,7 +290,7 @@ class ConfigDialog(QDialog):
         
         # T2
         t2_layout = QHBoxLayout()
-        t2_label = QLabel("T2 (s):")
+        t2_label = QLabel("T2 [s]:")
         t2_label.setFixedWidth(150)
         self.water_t2 = QDoubleSpinBox()
         self.water_t2.setRange(0.001, 5.0)
@@ -352,7 +352,7 @@ class ConfigDialog(QDialog):
         
         # T1
         t1_layout = QHBoxLayout()
-        t1_label = QLabel("T1 (s):")
+        t1_label = QLabel("T1 [s]:")
         t1_label.setFixedWidth(150)
         self.cest_t1 = QDoubleSpinBox()
         self.cest_t1.setRange(0.1, 10.0)
@@ -364,7 +364,7 @@ class ConfigDialog(QDialog):
         
         # T2
         t2_layout = QHBoxLayout()
-        t2_label = QLabel("T2 (s):")
+        t2_label = QLabel("T2 [s]:")
         t2_label.setFixedWidth(150)
         self.cest_t2 = QDoubleSpinBox()
         self.cest_t2.setRange(0.001, 5.0)
@@ -377,7 +377,7 @@ class ConfigDialog(QDialog):
         
         # k - exchange rate
         k_layout = QHBoxLayout()
-        k_label = QLabel("Exchange Rate (k) [Hz]:")
+        k_label = QLabel("Exchange Rate k [Hz]:")
         k_label.setFixedWidth(150)
         self.cest_k = QDoubleSpinBox()
         self.cest_k.setRange(0, 1000)
@@ -389,7 +389,7 @@ class ConfigDialog(QDialog):
         
         # dw - chemical shift
         dw_layout = QHBoxLayout()
-        dw_label = QLabel("Chemical Shift (dw) [ppm]:")
+        dw_label = QLabel("Chemical Shift dw [ppm]:")
         dw_label.setFixedWidth(150)
         self.cest_dw = QDoubleSpinBox()
         self.cest_dw.setRange(-10, 10)
