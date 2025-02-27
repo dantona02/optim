@@ -12,7 +12,7 @@ class HamburgerIcon(QWidget):
     """Custom hamburger menu icon widget with rotation animation."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(50, 40)  # Angepasste Größe an den Button
+        self.setFixedSize(60, 48)  # Vergrößert für bessere Erkennbarkeit
         self._rotation = 0
         
         # Setup animation
@@ -25,8 +25,8 @@ class HamburgerIcon(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # Calculate center point of the lines
-        center_x = 25  # Mittelpunkt der Linien (15 + 20/2)
-        center_y = 19  # Mittelpunkt zwischen oberster und unterster Linie (12 + 14/2)
+        center_x = 30  # Mittelpunkt der Linien, angepasst an neue Größe
+        center_y = 24  # Mittelpunkt zwischen oberster und unterster Linie
         
         # Rotate around the exact center of the three lines
         painter.translate(center_x, center_y)
@@ -36,9 +36,9 @@ class HamburgerIcon(QWidget):
         # Draw the three lines
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor('#E0E0E0'))
-        painter.drawRect(15, 12, 20, 2)  # Top line
-        painter.drawRect(15, 19, 20, 2)  # Middle line
-        painter.drawRect(15, 26, 20, 2)  # Bottom line
+        painter.drawRect(18, 15, 24, 2)  # Top line vergrößert
+        painter.drawRect(18, 24, 24, 2)  # Middle line vergrößert
+        painter.drawRect(18, 33, 24, 2)  # Bottom line vergrößert
     
     def animate_rotation(self, collapsed):
         """Animate the rotation based on collapsed state"""
@@ -70,7 +70,7 @@ class NavigationButton(QPushButton):
         self._text = text
         self._icon_path = icon_path
         self.collapsed = True
-        self.setMinimumHeight(40)
+        self.setMinimumHeight(48)  # Höhere Buttons für bessere Erkennbarkeit
         self.setCheckable(True)
         
         # Create a custom layout for the button content
@@ -85,7 +85,7 @@ class NavigationButton(QPushButton):
                 border: none;
                 border-radius: 0px;
                 font-weight: 500;
-                font-size: 13px;
+                font-size: 14px;
                 text-align: left;
             }
             
@@ -101,7 +101,7 @@ class NavigationButton(QPushButton):
             
             QLabel {
                 color: #E0E0E0;
-                font-size: 13px;
+                font-size: 14px;
                 font-weight: 500;
                 background-color: transparent;
             }
@@ -115,9 +115,9 @@ class NavigationButton(QPushButton):
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(0)
         
-        # Container for the icon (fixed width of 50px)
+        # Container for the icon (fixed width of 60px)
         self._icon_container = QWidget()
-        self._icon_container.setFixedWidth(50)
+        self._icon_container.setFixedWidth(60)  # Breiter für größere Icons
         self._icon_container.setStyleSheet("""
             QWidget {
                 background-color: transparent;
@@ -128,9 +128,9 @@ class NavigationButton(QPushButton):
         
         # Create icon label
         self._icon_label = QLabel()
-        self._icon_label.setFixedSize(QSize(20, 20))
+        self._icon_label.setFixedSize(QSize(26, 26))  # Größere Icons
         icon = QIcon(self._icon_path)
-        pixmap = icon.pixmap(QSize(20, 20))
+        pixmap = icon.pixmap(QSize(26, 26))  # Passend zur neuen Größe
         self._icon_label.setPixmap(pixmap)
         icon_layout.addWidget(self._icon_label, 0, Qt.AlignmentFlag.AlignCenter)
         
@@ -156,11 +156,11 @@ class NavigationButton(QPushButton):
         """Update the button appearance based on collapsed state"""
         if self.collapsed:
             self._text_container.hide()
-            self.setFixedWidth(50)
+            self.setFixedWidth(60)  # Breitere Buttons im eingeklappten Zustand
             self.setToolTip(self._text)
         else:
             self._text_container.show()
-            self.setFixedWidth(180)
+            self.setFixedWidth(200)  # Breitere Buttons im ausgeklappten Zustand
             self.setToolTip("")
         
         # Update margins based on checked state
@@ -205,7 +205,7 @@ class SideNavigation(QWidget):
     def setupUI(self):
         """Setup the user interface for the sidebar."""
         self.setObjectName("sideNavigation")
-        self.setFixedWidth(50)  # Initial collapsed width
+        self.setFixedWidth(60)  # Initial collapsed width erhöht
         
         # Get the current directory path
         current_dir = Path(__file__).resolve().parent
@@ -218,7 +218,7 @@ class SideNavigation(QWidget):
         
         # Header with hamburger menu button
         header_frame = QFrame()
-        header_frame.setFixedHeight(44)
+        header_frame.setFixedHeight(48)  # Höher für bessere Bedienbarkeit
         header_frame.setStyleSheet("""
             QFrame {
                 background-color: #212121;
@@ -234,7 +234,7 @@ class SideNavigation(QWidget):
         # Create and add the animated hamburger icon
         self.hamburger_icon = HamburgerIcon()
         self.hamburger_btn = QPushButton()
-        self.hamburger_btn.setFixedSize(50, 44)
+        self.hamburger_btn.setFixedSize(60, 48)  # Größerer Button
         self.hamburger_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -299,8 +299,8 @@ class SideNavigation(QWidget):
             background-color: #222222;
         """)
         nav_layout = QVBoxLayout(nav_container)
-        nav_layout.setContentsMargins(0, 2, 0, 2)  # Kleine Abstände oben und unten
-        nav_layout.setSpacing(1)  # Kleiner Abstand zwischen Buttons
+        nav_layout.setContentsMargins(0, 4, 0, 4)  # Größere Abstände oben und unten
+        nav_layout.setSpacing(2)  # Etwas mehr Abstand zwischen Buttons
         
         # Add navigation buttons
         self.nav_buttons = {}
@@ -327,7 +327,7 @@ class SideNavigation(QWidget):
         self.nav_buttons["animation"] = animation_btn
         
         # Settings button
-        settings_btn = NavigationButton(str(images_dir / 'settings.svg'), "Settings")
+        settings_btn = NavigationButton(str(images_dir / 'settings.png'), "Settings")
         self.button_group.addButton(settings_btn)
         settings_btn.clicked.connect(lambda: self._on_button_clicked("settings"))
         nav_layout.addWidget(settings_btn)
@@ -406,11 +406,11 @@ class SideNavigation(QWidget):
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         if self.collapsed:
-            self.animation.setStartValue(180)
-            self.animation.setEndValue(50)
+            self.animation.setStartValue(200)  # Breitere ausgeklappte Ansicht
+            self.animation.setEndValue(60)    # Breitere eingeklappte Ansicht
         else:
-            self.animation.setStartValue(50)
-            self.animation.setEndValue(180)
+            self.animation.setStartValue(60)   # Breitere eingeklappte Ansicht
+            self.animation.setEndValue(200)   # Breitere ausgeklappte Ansicht
         
         self.animation.start()
     
