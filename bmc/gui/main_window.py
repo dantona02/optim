@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout,
-    QFileDialog, QMessageBox
+    QFileDialog, QMessageBox, QStackedWidget
 )
 from PyQt6.QtCore import Qt
 import numpy as np
@@ -17,6 +17,8 @@ from bmc.utils.global_device import GLOBAL_DEVICE
 from bmc.gui.control_panel import ControlPanel
 from bmc.gui.plot_panel import PlotPanel
 from bmc.gui.config_dialog import ConfigDialog
+from bmc.gui.side_navigation import SideNavigation
+from bmc.gui.about_page import AboutPage
 
 class BMCSimulatorGUI(QMainWindow):
     def __init__(self):
@@ -85,10 +87,24 @@ class BMCSimulatorGUI(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QHBoxLayout(main_widget)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
-        # Create control panel
+        # Add side navigation
+        self.side_nav = SideNavigation()
+        self.side_nav.navigationChanged.connect(self._on_navigation_changed)
+        layout.addWidget(self.side_nav)
+        
+        # Create stacked widget for different pages
+        self.stack = QStackedWidget()
+        
+        # Create main simulation page
+        self.main_page = QWidget()
+        main_page_layout = QHBoxLayout(self.main_page)
+        main_page_layout.setContentsMargins(12, 12, 12, 12)
+        main_page_layout.setSpacing(12)
+        
+        # Create control panel for main page
         self.control_panel = ControlPanel()
         self.control_panel.setFixedWidth(420)  # Fixed width for control panel
         
@@ -99,17 +115,55 @@ class BMCSimulatorGUI(QMainWindow):
         self.control_panel.runSimulationClicked.connect(self._run_simulation)
         self.control_panel.saveResultsClicked.connect(self._save_results)
         
-        # Create plot panel
+        # Create plot panel for main page
         self.plot_panel = PlotPanel()
         
-        # Add panels to main layout
-        layout.addWidget(self.control_panel)
-        layout.addWidget(self.plot_panel)
+        # Add panels to main page layout
+        main_page_layout.addWidget(self.control_panel)
+        main_page_layout.addWidget(self.plot_panel)
+        main_page_layout.setStretch(0, 0)  # Control panel - no stretch
+        main_page_layout.setStretch(1, 1)  # Plot panel - should stretch
         
-        # Make sure the plot panel expands while control panel stays fixed
-        layout.setStretch(0, 0)  # Control panel - no stretch
-        layout.setStretch(1, 1)  # Plot panel - should stretch
+        # Create other pages
+        self.pulseseq_page = QWidget()
+        pulseseq_layout = QHBoxLayout(self.pulseseq_page)
+        pulseseq_layout.addWidget(QWidget())  # Placeholder
+        
+        self.animation_page = QWidget()
+        animation_layout = QHBoxLayout(self.animation_page)
+        animation_layout.addWidget(QWidget())  # Placeholder
+        
+        self.settings_page = QWidget()
+        settings_layout = QHBoxLayout(self.settings_page)
+        settings_layout.addWidget(QWidget())  # Placeholder
+        
+        self.about_page = AboutPage()
+        
+        # Add pages to stack
+        self.stack.addWidget(self.main_page)
+        self.stack.addWidget(self.pulseseq_page)
+        self.stack.addWidget(self.animation_page)
+        self.stack.addWidget(self.settings_page)
+        self.stack.addWidget(self.about_page)
+        
+        # Add stack to main layout
+        layout.addWidget(self.stack)
+        
+        # Set default page
+        self.stack.setCurrentIndex(0)  # Show main page by default
 
+    def _on_navigation_changed(self, page_name):
+        """Handle navigation changes"""
+        page_index = {
+            "main": 0,
+            "pulseseq": 1,
+            "animation": 2,
+            "settings": 3,
+            "about": 4
+        }.get(page_name, 0)
+        
+        self.stack.setCurrentIndex(page_index)
+        
     def _load_default_config(self):
         """Load default values for configuration"""
         self.config_params = {
