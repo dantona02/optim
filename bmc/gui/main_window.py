@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout,
     QFileDialog, QMessageBox, QStackedWidget
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 import numpy as np
 import torch
 import tempfile
@@ -19,6 +19,79 @@ from bmc.gui.plot_panel import PlotPanel
 from bmc.gui.config_dialog import ConfigDialog
 from bmc.gui.side_navigation import SideNavigation
 from bmc.gui.about_page import AboutPage
+
+
+class SimulationWorker(QThread):
+    """Worker thread for running BMC simulations without freezing the UI."""
+    progress_updated = pyqtSignal(int, int)  # (current, total)
+    status_updated = pyqtSignal(str)
+    simulation_completed = pyqtSignal(object)  # Sends the sim_engine
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, seq_file, sim_params, sim_settings):
+        super().__init__()
+        self.seq_file = seq_file
+        self.sim_params = sim_params
+        self.sim_settings = sim_settings
+        self.sim_engine = None
+        
+    def run(self):
+        """Run the simulation in a separate thread."""
+        try:
+            # Prepare z-positions
+            n_iso = self.sim_settings['n_iso']
+            low = -1e-3
+            high = 1e-3
+            z_pos = np.linspace(low, high, n_iso)
+            z_pos = torch.tensor(z_pos)
+            z_pos = torch.cat((z_pos, torch.tensor([0.0])))
+            
+            # Initialize simulation engine
+            self.sim_engine = BMCSim(
+                adc_time=self.sim_settings['adc_time'] / 1000.0,
+                params=self.sim_params,
+                seq_file=self.seq_file,
+                z_positions=z_pos,
+                n_backlog=self.sim_settings['n_backlog'],
+                verbose=False,
+                webhook=False
+            )
+            
+            # Setup progress tracking
+            total_events = len(self.sim_engine.seq.block_events)
+            self.progress_updated.emit(0, total_events)
+            
+            # Initialize magnetization
+            current_adc = 1
+            mag = torch.tensor(
+                self.sim_engine.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
+                dtype=torch.float64,
+                device=GLOBAL_DEVICE
+            )
+            
+            # Run simulation with progress tracking
+            for i, block_event in enumerate(self.sim_engine.seq.block_events, start=1):
+                counter = np.abs(total_events - i)
+                block = self.sim_engine.seq.get_block(block_event)
+                current_adc, mag = self.sim_engine.run_adc(block, current_adc, mag, counter)
+                
+                # Update progress bar
+                self.progress_updated.emit(i, total_events)
+                
+                # Update status text periodically
+                if i % 10 == 0 or i == total_events:
+                    self.status_updated.emit("Running simulation...")
+                
+            # Trim the magnetization data to the correct length
+            self.sim_engine.m_out = self.sim_engine.m_out[:, :, :self.sim_engine.t.numel()]
+            
+            # Signal completion
+            self.simulation_completed.emit(self.sim_engine)
+            
+        except Exception as e:
+            # Handle errors
+            self.error_occurred.emit(str(e))
+
 
 class BMCSimulatorGUI(QMainWindow):
     def __init__(self):
@@ -45,6 +118,8 @@ class BMCSimulatorGUI(QMainWindow):
         self.current_config = None
         self.current_seq = None
         self.config_params = {}
+        self.simulation_thread = None
+        self.temp_config_path = None
         
         # Load default configuration values
         self._load_default_config()
@@ -231,95 +306,83 @@ class BMCSimulatorGUI(QMainWindow):
         if not self.current_seq:
             QMessageBox.warning(self, "Missing Data", "Please load a sequence file.")
             return
+        
+        # Stop any ongoing simulation
+        if self.simulation_thread and self.simulation_thread.isRunning():
+            self.simulation_thread.terminate()
+            self.simulation_thread.wait()
             
         # Create temporary YAML file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as tmp:
             yaml.dump(self.config_params, tmp, default_flow_style=False)
-            temp_config_path = tmp.name
+            self.temp_config_path = tmp.name
         
         # Load and validate parameters
         try:
-            sim_params = load_params(temp_config_path)
+            sim_params = load_params(self.temp_config_path)
         except (AssertionError, AttributeError) as e:
             QMessageBox.critical(self, "Invalid Parameters", f"Error in parameters: {str(e)}")
+            self._cleanup_temp_file()
             return
         
         # Get simulation parameters from control panel
         sim_settings = self.control_panel.get_simulation_parameters()
         
-        # Prepare z-positions
-        n_iso = sim_settings['n_iso']
-        low = -1e-3
-        high = 1e-3
-        z_pos = np.linspace(low, high, n_iso)
-        z_pos = torch.tensor(z_pos)
-        z_pos = torch.cat((z_pos, torch.tensor([0.0])))
-        
         # Update GUI status before simulation
         self.control_panel.enable_controls(False)
-        self.control_panel.set_status("Simulation running...")
+        self.control_panel.set_status("Starting simulation...")
         
-        try:
-            # Initialize simulation engine
-            self.sim_engine = BMCSim(
-                adc_time=sim_settings['adc_time'] / 1000.0,
-                params=sim_params,
-                seq_file=self.current_seq,
-                z_positions=z_pos,
-                n_backlog=sim_settings['n_backlog'],
-                verbose=False,
-                webhook=False
-            )
-            
-            # Setup progress tracking
-            total_events = len(self.sim_engine.seq.block_events)
-            self.control_panel.update_progress(0, total_events)
-            
-            # Initialize magnetization
-            current_adc = 1
-            mag = torch.tensor(
-                self.sim_engine.m_init[np.newaxis, np.newaxis, :, np.newaxis], 
-                dtype=torch.float64,
-                device=GLOBAL_DEVICE
-            )
-            
-            # Run simulation with progress tracking
-            for i, block_event in enumerate(self.sim_engine.seq.block_events, start=1):
-                counter = np.abs(total_events - i)
-                block = self.sim_engine.seq.get_block(block_event)
-                current_adc, mag = self.sim_engine.run_adc(block, current_adc, mag, counter)
-                
-                # Update progress bar
-                self.control_panel.update_progress(i)
-                
-                # Update status text periodically
-                if i % 10 == 0 or i == total_events:
-                    self.control_panel.set_status("Running simulation...")
-                
-            # Trim the magnetization data to the correct length
-            self.sim_engine.m_out = self.sim_engine.m_out[:, :, :self.sim_engine.t.numel()]
-            
-            # Update plots and GUI status
-            self.plot_panel.plot_results(self.sim_engine)
-            
-            self.control_panel.set_status("Simulation completed successfully", is_success=True)
-            self.control_panel.enable_save_button(True)
-            
-        except Exception as e:
-            # Handle errors
-            error_msg = str(e)
-            self.control_panel.set_status(f"Error: {error_msg[:100]}...", is_error=True)
-            print(f"Simulation error: {error_msg}")
-            
-        finally:
-            # Clean up temp file
+        # Create simulation thread
+        self.simulation_thread = SimulationWorker(
+            seq_file=self.current_seq,
+            sim_params=sim_params,
+            sim_settings=sim_settings
+        )
+        
+        # Connect signals from worker
+        self.simulation_thread.progress_updated.connect(self.control_panel.update_progress)
+        self.simulation_thread.status_updated.connect(self.control_panel.set_status)
+        self.simulation_thread.simulation_completed.connect(self._simulation_finished)
+        self.simulation_thread.error_occurred.connect(self._simulation_error)
+        
+        # Start the thread
+        self.simulation_thread.start()
+    
+    @pyqtSlot(object)
+    def _simulation_finished(self, sim_engine):
+        """Handle successful simulation completion."""
+        # Store the sim_engine
+        self.sim_engine = sim_engine
+        
+        # Update plots
+        self.plot_panel.plot_results(self.sim_engine)
+        
+        # Update UI status
+        self.control_panel.set_status("Simulation completed successfully", is_success=True)
+        self.control_panel.enable_save_button(True)
+        self.control_panel.enable_controls(True)
+        
+        # Clean up
+        self._cleanup_temp_file()
+    
+    @pyqtSlot(str)
+    def _simulation_error(self, error_message):
+        """Handle simulation errors."""
+        self.control_panel.set_status(f"Error: {error_message[:100]}...", is_error=True)
+        self.control_panel.enable_controls(True)
+        print(f"Simulation error: {error_message}")
+        
+        # Clean up
+        self._cleanup_temp_file()
+    
+    def _cleanup_temp_file(self):
+        """Clean up temporary configuration file."""
+        if self.temp_config_path and os.path.exists(self.temp_config_path):
             try:
-                os.unlink(temp_config_path)
-            except:
-                pass
-                
-            # Re-enable controls
-            self.control_panel.enable_controls(True)
+                os.unlink(self.temp_config_path)
+                self.temp_config_path = None
+            except Exception as e:
+                print(f"Could not delete temporary file: {e}")
         
     def _save_results(self):
         """Save simulation results to a file"""
@@ -346,4 +409,17 @@ class BMCSimulatorGUI(QMainWindow):
                 m_trans=m_trans.cpu().numpy(),
                 m_trans_total=m_trans_total.cpu().numpy()
             )
+            
+    def closeEvent(self, event):
+        """Handle window close event to clean up resources."""
+        # Stop any ongoing simulation
+        if self.simulation_thread and self.simulation_thread.isRunning():
+            self.simulation_thread.terminate()
+            self.simulation_thread.wait()
+        
+        # Clean up temporary files
+        self._cleanup_temp_file()
+        
+        # Accept the event to close the window
+        event.accept()
 
