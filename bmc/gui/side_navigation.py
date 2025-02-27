@@ -67,7 +67,7 @@ class NavigationButton(QPushButton):
     
     def __init__(self, icon_path, text, parent=None):
         super().__init__(parent)
-        self._text = text  # Store the text separately
+        self._text = text
         self._icon_path = icon_path
         self.collapsed = True
         self.setMinimumHeight(40)
@@ -106,8 +106,7 @@ class NavigationButton(QPushButton):
                 background-color: transparent;
             }
         """
-        self.setStyleSheet(self._default_style)
-        
+        super().setStyleSheet(self._default_style)
         self.updateAppearance()
     
     def _init_layout(self):
@@ -161,21 +160,29 @@ class NavigationButton(QPushButton):
             self.setToolTip(self._text)
         else:
             self._text_container.show()
-            self.setFixedWidth(150)
+            self.setFixedWidth(180)
             self.setToolTip("")
         
         # Update margins based on checked state
         if self.isChecked():
             self._icon_container.setContentsMargins(3, 0, 0, 0)
-            self.setStyleSheet(self._default_style + """
+            self._updateStyle(True)
+        else:
+            self._icon_container.setContentsMargins(0, 0, 0, 0)
+            self._updateStyle(False)
+    
+    def _updateStyle(self, is_checked):
+        """Update the style without causing recursion"""
+        if is_checked:
+            style = self._default_style + """
                 QPushButton {
                     background-color: #2D2D2D;
                     border-left: 3px solid #2962FF;
                 }
-            """)
+            """
         else:
-            self._icon_container.setContentsMargins(0, 0, 0, 0)
-            self.setStyleSheet(self._default_style)
+            style = self._default_style
+        super().setStyleSheet(style)
     
     def setChecked(self, checked):
         """Override setChecked to update the visual style"""
@@ -192,6 +199,7 @@ class SideNavigation(QWidget):
         super().__init__(parent)
         self.collapsed = True
         self.current_button = None
+        self._updating = False  # Flag to prevent recursion
         self.setupUI()
     
     def setupUI(self):
@@ -282,12 +290,12 @@ class SideNavigation(QWidget):
         # Add navigation buttons
         self.nav_buttons = {}
         
-        # Main/Home button
+        # Simulation button
         main_btn = NavigationButton(str(images_dir / 'wave.png'), "Simulation")
         self.button_group.addButton(main_btn)
         main_btn.clicked.connect(lambda: self._on_button_clicked("simulation"))
         nav_layout.addWidget(main_btn)
-        self.nav_buttons["main"] = main_btn
+        self.nav_buttons["simulation"] = main_btn
         
         # PulseSeq button
         pulseseq_btn = NavigationButton(str(images_dir / 'pulseq_logo.png'), "PulSeq")
@@ -331,24 +339,30 @@ class SideNavigation(QWidget):
             }
         """)
         
-        # Set main as default selected
-        self._on_button_clicked("main")
+        # Set simulation as default selected
+        self._on_button_clicked("simulation")
     
     def _on_button_clicked(self, page_name):
         """Handle button clicks and emit navigation signal"""
-        if page_name in self.nav_buttons:
-            # Uncheck previous button if it exists and is different
-            if self.current_button and self.current_button != self.nav_buttons[page_name]:
-                self.current_button.setChecked(False)
-                self.current_button.updateAppearance()
+        if self._updating or page_name not in self.nav_buttons:
+            return
             
-            # Set and check new button
+        self._updating = True
+        try:
+            for name, button in self.nav_buttons.items():
+                if name != page_name:
+                    button.setChecked(False)
+                    button._updateStyle(False)
+            
+            # Aktiviere den ausgewählten Button
             self.current_button = self.nav_buttons[page_name]
             self.current_button.setChecked(True)
-            self.current_button.updateAppearance()
+            self.current_button._updateStyle(True)
             
             # Emit navigation signal
             self.navigationChanged.emit(page_name)
+        finally:
+            self._updating = False
     
     def toggleCollapse(self):
         """Toggle between collapsed and expanded state."""
@@ -368,17 +382,17 @@ class SideNavigation(QWidget):
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         if self.collapsed:
-            self.animation.setStartValue(150)
+            self.animation.setStartValue(180)
             self.animation.setEndValue(50)
         else:
             self.animation.setStartValue(50)
-            self.animation.setEndValue(150)
+            self.animation.setEndValue(180)
         
         self.animation.start()
     
     def setCurrentPage(self, page_name):
         """Set the current selected page in the navigation."""
-        if page_name in self.nav_buttons:
+        if not self._updating and page_name in self.nav_buttons:
             self._on_button_clicked(page_name)
     
     @pyqtProperty(int)

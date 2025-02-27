@@ -155,14 +155,16 @@ class BMCSimulatorGUI(QMainWindow):
     def _on_navigation_changed(self, page_name):
         """Handle navigation changes"""
         page_index = {
-            "main": 0,
+            "simulation": 0,  # Geändert von "main" zu "simulation"
             "pulseseq": 1,
             "animation": 2,
             "settings": 3,
             "about": 4
         }.get(page_name, 0)
         
+        # Setze den korrekten Index und stelle sicher, dass der Button aktiv bleibt
         self.stack.setCurrentIndex(page_index)
+        self.side_nav.setCurrentPage(page_name)
         
     def _load_default_config(self):
         """Load default values for configuration"""
