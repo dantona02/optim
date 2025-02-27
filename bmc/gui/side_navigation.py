@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QFrame, QSizePolicy, QScrollArea, QButtonGroup, QHBoxLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QIcon, QPainter, QColor
+from PyQt6.QtGui import QIcon, QPainter, QColor, QLinearGradient, QPalette, QPen, QFont, QFontMetrics
 from pathlib import Path
 import os
 
@@ -218,17 +218,23 @@ class SideNavigation(QWidget):
         
         # Header with hamburger menu button
         header_frame = QFrame()
-        header_frame.setFixedHeight(40)
-        header_frame.setStyleSheet("background-color: #252525;")
+        header_frame.setFixedHeight(44)
+        header_frame.setStyleSheet("""
+            QFrame {
+                background-color: #212121;
+                border: none;
+            }
+        """)
+        
         header_layout = QHBoxLayout(header_frame)
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(0)
-        header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # Links ausrichten
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         
         # Create and add the animated hamburger icon
         self.hamburger_icon = HamburgerIcon()
         self.hamburger_btn = QPushButton()
-        self.hamburger_btn.setFixedSize(50, 40)
+        self.hamburger_btn.setFixedSize(50, 44)
         self.hamburger_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -238,6 +244,10 @@ class SideNavigation(QWidget):
             
             QPushButton:hover {
                 background-color: #383838;
+            }
+            
+            QPushButton:pressed {
+                background-color: #404040;
             }
         """)
         self.hamburger_btn.clicked.connect(self.toggleCollapse)
@@ -252,26 +262,29 @@ class SideNavigation(QWidget):
         self.button_group = QButtonGroup(self)
         self.button_group.setExclusive(True)
         
-        # Scroll area for navigation items
+        # Scroll area for navigation items with improved style
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setStyleSheet("""
             QScrollArea {
-                background-color: #252525;
+                background-color: #222222;
                 border: none;
             }
             QScrollBar:vertical {
                 border: none;
                 background: #2A2A2A;
-                width: 8px;
+                width: 6px;
                 margin: 0px;
             }
             QScrollBar::handle:vertical {
-                background: #3E3E3E;
+                background: #4D4D4D;
                 min-height: 20px;
-                border-radius: 4px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #666666;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 border: none;
@@ -282,10 +295,12 @@ class SideNavigation(QWidget):
         
         # Container for navigation items
         nav_container = QWidget()
-        nav_container.setStyleSheet("background-color: #252525;")
+        nav_container.setStyleSheet("""
+            background-color: #222222;
+        """)
         nav_layout = QVBoxLayout(nav_container)
-        nav_layout.setContentsMargins(0, 0, 0, 0)
-        nav_layout.setSpacing(0)
+        nav_layout.setContentsMargins(0, 2, 0, 2)  # Kleine Abstände oben und unten
+        nav_layout.setSpacing(1)  # Kleiner Abstand zwischen Buttons
         
         # Add navigation buttons
         self.nav_buttons = {}
@@ -331,11 +346,20 @@ class SideNavigation(QWidget):
         scroll_area.setWidget(nav_container)
         layout.addWidget(scroll_area)
         
-        # Set the sidebar's style
+        # Erstellen eines dedizierten rechten Border-Frames
+        right_border = QFrame(self)
+        right_border.setFixedWidth(1)
+        right_border.setStyleSheet("background-color: #444444;")  # Dunklere Graufarbe
+        right_border.setGeometry(self.width()-1, 0, 1, self.height())
+        
+        # Stellen Sie sicher, dass sich der Border bei Größenänderung anpasst
+        self.resizeEvent = lambda e: right_border.setGeometry(self.width()-1, 0, 1, self.height())
+        
+        # Set the sidebar's style with border on the right side (als Backup)
         self.setStyleSheet("""
             #sideNavigation {
-                background-color: #252525;
-                border-right: 1px solid #333333;
+                background-color: #222222;
+                border-right: 1px solid #444444;
             }
         """)
         
