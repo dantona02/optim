@@ -38,6 +38,7 @@ class ConfigDialog(QDialog):
                 border: 1px solid #383838;
                 border-radius: 6px;
                 padding: 5px 8px;
+                padding-right: 20px;  /* Mehr Platz für die größeren Buttons */
                 min-width: 100px;
                 min-height: 32px;
                 font-size: 13px;
@@ -56,21 +57,23 @@ class ConfigDialog(QDialog):
             QDoubleSpinBox::up-button, QSpinBox::up-button {{
                 subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 22px;
-                height: 15px;
+                width: 20px;  /* Größere Buttons */
+                height: 16px;
                 border: none;
                 background-color: transparent;
                 margin: 1px 1px 0px 0px;
+                border-top-right-radius: 5px;  /* Angepasster Radius */
             }}
             
             QDoubleSpinBox::down-button, QSpinBox::down-button {{
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
-                width: 22px;
-                height: 15px;
+                width: 20px;  /* Größere Buttons */
+                height: 16px;
                 border: none;
                 background-color: transparent;
                 margin: 0px 1px 1px 0px;
+                border-bottom-right-radius: 5px;  /* Angepasster Radius */
             }}
             
             QDoubleSpinBox::up-button:hover, QSpinBox::up-button:hover,
@@ -123,90 +126,82 @@ class ConfigDialog(QDialog):
                                           stop:0 #2962FF, stop:1 #2962FF);
             }}
             
-            QProgressBar {{
+            QTabWidget::pane {{
                 border: none;
                 background-color: #2A2A2A;
-                min-height: 6px;
-                max-height: 6px;
-                border-radius: 3px;
-                margin: 12px 0px;
-            }}
-            
-            QProgressBar::chunk {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                                          stop:0 #4CAF50, stop:1 #81C784);
-                border-radius: 3px;
-            }}
-            
-            QComboBox {{
-                background-color: #2A2A2A;
-                color: #E0E0E0;
-                border: 1px solid #383838;
-                border-radius: 6px;
-                padding: 5px 8px;
-                min-width: 100px;
-                min-height: 32px;
-                font-size: 13px;
-            }}
-            
-            QComboBox:hover {{
-                border: 1px solid #424242;
-                background-color: #2D2D2D;
-            }}
-            
-            QComboBox:focus {{
-                border: 1px solid #2962FF;
-                background-color: #2D2D2D;
-            }}
-            
-            QTabWidget::pane {{
-                border: 1px solid #383838;
                 border-radius: 8px;
-                background-color: #2A2A2A;
+                margin-top: 2px;
+            }}
+            
+            QTabWidget {{
+                background-color: transparent;
+            }}
+            
+            QTabBar {{
+                background-color: transparent;
+                border-bottom: none;
             }}
             
             QTabBar::tab {{
                 background-color: transparent;
                 color: #888888;
-                padding: 8px 16px;
+                padding: 12px 24px;
                 margin-right: 4px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
+                margin-bottom: -1px;
                 font-size: 13px;
+                font-weight: 600;
+                min-width: 120px;
+                border: none;
+                border-radius: 0px;
+                border-top-left-radius: 0px;
+                border-top-right-radius: 0px;
+                border-bottom: 2px solid transparent;
+            }}
+            
+            QTabBar::tab:hover {{
+                color: #E0E0E0;
+                border-radius: 0px;
+                border-top-left-radius: 0px;
+                border-top-right-radius: 0px;
+                background-color: #383838;
+                border-bottom: 2px solid #404040;
             }}
             
             QTabBar::tab:selected {{
                 color: #2962FF;
-                background-color: #2A2A2A;
-                border: 1px solid #383838;
-                border-bottom: none;
+                background-color: transparent;
+                border-bottom: 2px solid #2962FF;
             }}
             
-            QTabBar::tab:hover:!selected {{
-                color: #E0E0E0;
+            QWidget#qt_tabwidget_stackedwidget {{
+                background-color: #2A2A2A;
+                border-radius: 8px;
+                padding: 16px;
             }}
             
             QCheckBox {{
                 color: #E0E0E0;
                 font-size: 13px;
+                spacing: 8px;
             }}
             
             QCheckBox::indicator {{
                 width: 18px;
                 height: 18px;
-                border: 1px solid #383838;
+                border: 2px solid #383838;
                 border-radius: 4px;
                 background-color: #2A2A2A;
             }}
             
             QCheckBox::indicator:hover {{
-                border: 1px solid #424242;
+                border: 2px solid #424242;
                 background-color: #2D2D2D;
             }}
             
             QCheckBox::indicator:checked {{
                 background-color: #2962FF;
-                border: 1px solid #2962FF;
+                border: 2px solid #2962FF;
+                image: url("path/to/checkmark.png");
             }}
         """)
         
@@ -226,11 +221,6 @@ class ConfigDialog(QDialog):
         
         # Buttons
         button_layout = QHBoxLayout()
-        
-        # Load config button
-        load_btn = QPushButton("Load Config")
-        load_btn.clicked.connect(self._load_config)
-        button_layout.addWidget(load_btn)
         
         # Save config button
         save_btn = QPushButton("Save Config")
@@ -618,22 +608,6 @@ class ConfigDialog(QDialog):
                 self.cest_pool_selection.removeItem(current_index)
         else:
             QMessageBox.information(self, "Information", "You must keep at least one CEST pool.")
-
-    def _load_config(self):
-        """Loads a configuration file"""
-        sim_lib_path = str(Path(__file__).resolve().parent.parent.parent / "sim_lib")
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Load Config File",
-            sim_lib_path,
-            "YAML Files (*.yaml)"
-        )
-        if filename:
-            with open(filename, 'r') as f:
-                self.config_params = yaml.safe_load(f)
-            
-            # Update GUI elements
-            self._reset_gui_elements()
 
     def _save_config(self):
         """Saves the current configuration"""

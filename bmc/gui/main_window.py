@@ -155,6 +155,7 @@ class BMCSimulatorGUI(QMainWindow):
             }
             QTabBar::tab:hover:!selected {
                 color: #E0E0E0;
+                background-color: rgba(41, 98, 255, 0.05);
             }
         """)
         
