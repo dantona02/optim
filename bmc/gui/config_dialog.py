@@ -225,26 +225,32 @@ class ConfigDialog(QDialog):
         
         # Buttons
         button_layout = QHBoxLayout()
+        button_layout.addStretch(1)  # Flexibler Platz vor den Buttons
         
         # Save config button
         save_btn = QPushButton("Save Config")
         save_btn.clicked.connect(self._save_config)
         button_layout.addWidget(save_btn)
+        button_layout.addSpacing(8)  # Fixer Abstand zwischen den Buttons
         
         # Reset button
         reset_btn = QPushButton("Reset")
         reset_btn.clicked.connect(self._reset_config)
         button_layout.addWidget(reset_btn)
+        button_layout.addSpacing(8)  # Fixer Abstand zwischen den Buttons
         
-        # OK/Cancel buttons
+        # OK button
         ok_btn = QPushButton("OK")
         ok_btn.clicked.connect(self.accept)
+        button_layout.addWidget(ok_btn)
+        button_layout.addSpacing(8)  # Fixer Abstand zwischen den Buttons
+        
+        # Cancel button
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
-        
-        button_layout.addStretch()
-        button_layout.addWidget(ok_btn)
         button_layout.addWidget(cancel_btn)
+        
+        button_layout.addStretch(1)  # Flexibler Platz nach den Buttons
         
         layout.addLayout(button_layout)
         
