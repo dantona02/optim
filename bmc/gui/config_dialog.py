@@ -140,6 +140,7 @@ class ConfigDialog(QDialog):
             QTabBar {{
                 background-color: transparent;
                 border-bottom: none;
+                border-radius: 0px;
             }}
             
             QTabBar::tab {{
@@ -158,18 +159,21 @@ class ConfigDialog(QDialog):
                 border-bottom: 2px solid transparent;
             }}
             
-            QTabBar::tab:hover {{
+            QTabBar::tab:hover:!selected {{
                 color: #E0E0E0;
-                border-radius: 0px;
-                border-top-left-radius: 0px;
-                border-top-right-radius: 0px;
                 background-color: #383838;
                 border-bottom: 2px solid #404040;
             }}
             
             QTabBar::tab:selected {{
                 color: #2962FF;
-                background-color: transparent;
+                background-color: #2D2D2D;
+                border-bottom: 2px solid #2962FF;
+            }}
+            
+            QTabBar::tab:selected:hover {{
+                color: #2962FF;
+                background-color: #383838;
                 border-bottom: 2px solid #2962FF;
             }}
             
