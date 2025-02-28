@@ -207,6 +207,66 @@ class ConfigDialog(QDialog):
                 border: 2px solid #2962FF;
                 image: url("path/to/checkmark.png");
             }}
+            
+            QComboBox {{
+                background-color: #2A2A2A;
+                color: #E0E0E0;
+                border: 1px solid #383838;
+                border-radius: 6px;
+                padding: 5px 8px;
+                padding-right: 20px;
+                min-width: 160px;
+                min-height: 32px;
+                font-size: 13px;
+            }}
+            
+            QComboBox:hover {{
+                border: 1px solid #424242;
+                background-color: #2D2D2D;
+            }}
+            
+            QComboBox:focus {{
+                border: 1px solid #2962FF;
+                background-color: #2D2D2D;
+            }}
+            
+            QComboBox::drop-down {{
+                border: none;
+                width: 25px;
+            }}
+            
+            QComboBox::down-arrow {{
+                image: url("{down_arrow_url}");
+                width: 10px;
+                height: 10px;
+            }}
+            
+            QComboBox::down-arrow:disabled {{
+                image: none;
+            }}
+            
+            QComboBox QAbstractItemView {{
+                background-color: #2A2A2A;
+                color: #E0E0E0;
+                border: 1px solid #383838;
+                selection-background-color: #2962FF;
+                selection-color: white;
+                outline: none;
+                padding: 4px;
+            }}
+            
+            QComboBox QAbstractItemView::item {{
+                min-height: 24px;
+                padding: 4px;
+            }}
+            
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: rgba(41, 98, 255, 0.1);
+            }}
+            
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: #2962FF;
+            }}
         """)
         
         # Main layout
@@ -318,14 +378,13 @@ class ConfigDialog(QDialog):
         main_layout.setContentsMargins(24, 24, 24, 24)
         
         # Dropdown for selecting the CEST pool
-        self.cest_pool_selection = QComboBox()
-        self.cest_pool_selection.addItem("amide")
-        self.cest_pool_selection.currentTextChanged.connect(self._update_cest_pool_display)
-        
         pool_selection_layout = QHBoxLayout()
         pool_selection_layout.setSpacing(40)
         pool_label = QLabel("CEST Pool:")
         pool_label.setFixedWidth(200)
+        self.cest_pool_selection = QComboBox()
+        self.cest_pool_selection.addItem("amide")
+        self.cest_pool_selection.currentTextChanged.connect(self._update_cest_pool_display)
         pool_selection_layout.addWidget(pool_label)
         pool_selection_layout.addWidget(self.cest_pool_selection)
         
@@ -336,11 +395,16 @@ class ConfigDialog(QDialog):
         remove_pool_btn.clicked.connect(self._remove_cest_pool)
         
         btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
         btn_layout.addWidget(add_pool_btn)
+        btn_layout.addSpacing(8)
         btn_layout.addWidget(remove_pool_btn)
+        btn_layout.addStretch()
         
         main_layout.addLayout(pool_selection_layout)
+        main_layout.addSpacing(16)  # Abstand zwischen ComboBox und Buttons
         main_layout.addLayout(btn_layout)
+        main_layout.addSpacing(24)  # Größerer Abstand nach den Buttons
         
         # Container for pool parameters
         param_widget = QWidget()
