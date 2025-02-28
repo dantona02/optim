@@ -128,8 +128,8 @@ class ConfigDialog(QDialog):
             
             QTabWidget::pane {{
                 border: none;
-                background-color: #2A2A2A;
-                border-radius: 8px;
+                background-color: rgba(42, 42, 42, 0.4);
+                border-radius: 4px;
                 margin-top: 2px;
             }}
             
@@ -178,9 +178,9 @@ class ConfigDialog(QDialog):
             }}
             
             QWidget#qt_tabwidget_stackedwidget {{
-                background-color: #2A2A2A;
-                border-radius: 8px;
-                padding: 16px;
+                background-color: rgba(42, 42, 42, 0.4);
+                border-radius: 4px;
+                padding: 2px;
             }}
             
             QCheckBox {{
