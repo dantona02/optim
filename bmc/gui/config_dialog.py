@@ -57,8 +57,8 @@ class ConfigDialog(QDialog):
             QDoubleSpinBox::up-button, QSpinBox::up-button {{
                 subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 20px;  /* Größere Buttons */
-                height: 16px;
+                width: 25px;  /* Größere Buttons */
+                height: 21px;
                 border: none;
                 background-color: transparent;
                 margin: 1px 1px 0px 0px;
@@ -68,8 +68,8 @@ class ConfigDialog(QDialog):
             QDoubleSpinBox::down-button, QSpinBox::down-button {{
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
-                width: 20px;  /* Größere Buttons */
-                height: 16px;
+                width: 25px;  /* Größere Buttons */
+                height: 21px;
                 border: none;
                 background-color: transparent;
                 margin: 0px 1px 1px 0px;
@@ -254,18 +254,21 @@ class ConfigDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        # Set a reasonable size
-        self.resize(600, 500)
+        # Setze fixe Fenstergröße
+        # self.setFixedSize(700, 500)
 
     def _create_water_pool_tab(self):
         """Creates the tab for water pool parameters"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)  # Füge Außenabstände hinzu
         
         # Factors
         f_layout = QHBoxLayout()
+        f_layout.setSpacing(40)
         f_label = QLabel("Relative Pool Size (f):")
-        f_label.setFixedWidth(150)
+        f_label.setFixedWidth(200)
         self.water_f = QDoubleSpinBox()
         self.water_f.setRange(0.1, 10.0)
         self.water_f.setValue(self.config_params["water_pool"]["f"])
@@ -277,8 +280,9 @@ class ConfigDialog(QDialog):
         
         # T1
         t1_layout = QHBoxLayout()
+        t1_layout.setSpacing(40)
         t1_label = QLabel("T1 [s]:")
-        t1_label.setFixedWidth(150)
+        t1_label.setFixedWidth(200)
         self.water_t1 = QDoubleSpinBox()
         self.water_t1.setRange(0.1, 10.0)
         self.water_t1.setValue(self.config_params["water_pool"]["t1"])
@@ -290,8 +294,9 @@ class ConfigDialog(QDialog):
         
         # T2
         t2_layout = QHBoxLayout()
+        t2_layout.setSpacing(40)
         t2_label = QLabel("T2 [s]:")
-        t2_label.setFixedWidth(150)
+        t2_label.setFixedWidth(200)
         self.water_t2 = QDoubleSpinBox()
         self.water_t2.setRange(0.001, 5.0)
         self.water_t2.setValue(self.config_params["water_pool"]["t2"])
@@ -309,6 +314,8 @@ class ConfigDialog(QDialog):
         """Creates the tab for CEST pool parameters"""
         tab = QWidget()
         main_layout = QVBoxLayout(tab)
+        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(24, 24, 24, 24)
         
         # Dropdown for selecting the CEST pool
         self.cest_pool_selection = QComboBox()
@@ -316,7 +323,10 @@ class ConfigDialog(QDialog):
         self.cest_pool_selection.currentTextChanged.connect(self._update_cest_pool_display)
         
         pool_selection_layout = QHBoxLayout()
-        pool_selection_layout.addWidget(QLabel("CEST Pool:"))
+        pool_selection_layout.setSpacing(40)
+        pool_label = QLabel("CEST Pool:")
+        pool_label.setFixedWidth(200)
+        pool_selection_layout.addWidget(pool_label)
         pool_selection_layout.addWidget(self.cest_pool_selection)
         
         # Buttons for adding/removing pools
@@ -335,12 +345,14 @@ class ConfigDialog(QDialog):
         # Container for pool parameters
         param_widget = QWidget()
         param_layout = QVBoxLayout(param_widget)
+        param_layout.setSpacing(16)
         
         # Parameter fields
         # f - relative pool size
         f_layout = QHBoxLayout()
+        f_layout.setSpacing(40)
         f_label = QLabel("Relative Pool Size (f):")
-        f_label.setFixedWidth(150)
+        f_label.setFixedWidth(200)
         self.cest_f = QDoubleSpinBox()
         self.cest_f.setRange(0.00001, 0.1)
         self.cest_f.setDecimals(6)
@@ -352,8 +364,9 @@ class ConfigDialog(QDialog):
         
         # T1
         t1_layout = QHBoxLayout()
+        t1_layout.setSpacing(40)
         t1_label = QLabel("T1 [s]:")
-        t1_label.setFixedWidth(150)
+        t1_label.setFixedWidth(200)
         self.cest_t1 = QDoubleSpinBox()
         self.cest_t1.setRange(0.1, 10.0)
         self.cest_t1.setSingleStep(0.1)
@@ -364,8 +377,9 @@ class ConfigDialog(QDialog):
         
         # T2
         t2_layout = QHBoxLayout()
+        t2_layout.setSpacing(40)
         t2_label = QLabel("T2 [s]:")
-        t2_label.setFixedWidth(150)
+        t2_label.setFixedWidth(200)
         self.cest_t2 = QDoubleSpinBox()
         self.cest_t2.setRange(0.001, 5.0)
         self.cest_t2.setSingleStep(0.01)
@@ -377,8 +391,9 @@ class ConfigDialog(QDialog):
         
         # k - exchange rate
         k_layout = QHBoxLayout()
+        k_layout.setSpacing(40)
         k_label = QLabel("Exchange Rate k [Hz]:")
-        k_label.setFixedWidth(150)
+        k_label.setFixedWidth(200)
         self.cest_k = QDoubleSpinBox()
         self.cest_k.setRange(0, 1000)
         self.cest_k.setSingleStep(10)
@@ -389,8 +404,9 @@ class ConfigDialog(QDialog):
         
         # dw - chemical shift
         dw_layout = QHBoxLayout()
+        dw_layout.setSpacing(40)
         dw_label = QLabel("Chemical Shift dw [ppm]:")
-        dw_label.setFixedWidth(150)
+        dw_label.setFixedWidth(200)
         self.cest_dw = QDoubleSpinBox()
         self.cest_dw.setRange(-10, 10)
         self.cest_dw.setSingleStep(0.5)
@@ -412,11 +428,14 @@ class ConfigDialog(QDialog):
         """Creates the tab for scanner settings"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
         
         # B0 - Field strength
         b0_layout = QHBoxLayout()
+        b0_layout.setSpacing(40)
         b0_label = QLabel("B0 Field Strength [T]:")
-        b0_label.setFixedWidth(150)
+        b0_label.setFixedWidth(200)
         self.scanner_b0 = QDoubleSpinBox()
         self.scanner_b0.setRange(1.0, 20.0)
         self.scanner_b0.setValue(self.config_params["b0"])
@@ -428,8 +447,9 @@ class ConfigDialog(QDialog):
         
         # gamma - gyromagnetic ratio
         gamma_layout = QHBoxLayout()
+        gamma_layout.setSpacing(40)
         gamma_label = QLabel("Gyromagnetic Ratio [rad/uT]:")
-        gamma_label.setFixedWidth(150)
+        gamma_label.setFixedWidth(200)
         self.scanner_gamma = QDoubleSpinBox()
         self.scanner_gamma.setRange(100.0, 300.0)
         self.scanner_gamma.setValue(self.config_params["gamma"])
@@ -442,8 +462,9 @@ class ConfigDialog(QDialog):
         
         # b0_inhom - field inhomogeneity
         b0_inhom_layout = QHBoxLayout()
+        b0_inhom_layout.setSpacing(40)
         b0_inhom_label = QLabel("B0 Inhomogeneity [ppm]:")
-        b0_inhom_label.setFixedWidth(150)
+        b0_inhom_label.setFixedWidth(200)
         self.scanner_b0_inhom = QDoubleSpinBox()
         self.scanner_b0_inhom.setRange(0.0, 1.0)
         self.scanner_b0_inhom.setValue(self.config_params["b0_inhom"])
@@ -456,8 +477,9 @@ class ConfigDialog(QDialog):
         
         # rel_b1 - relative amplitude inhomogeneity
         rel_b1_layout = QHBoxLayout()
+        rel_b1_layout.setSpacing(40)
         rel_b1_label = QLabel("Relative B1 Inhomogeneity:")
-        rel_b1_label.setFixedWidth(150)
+        rel_b1_label.setFixedWidth(200)
         self.scanner_rel_b1 = QDoubleSpinBox()
         self.scanner_rel_b1.setRange(0.1, 2.0)
         self.scanner_rel_b1.setValue(self.config_params["rel_b1"])
@@ -474,11 +496,14 @@ class ConfigDialog(QDialog):
         """Creates the tab for advanced settings"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
         
         # verbose - detailed output
         verbose_layout = QHBoxLayout()
+        verbose_layout.setSpacing(40)
         verbose_label = QLabel("Verbose Output:")
-        verbose_label.setFixedWidth(150)
+        verbose_label.setFixedWidth(200)
         self.advanced_verbose = QCheckBox()
         self.advanced_verbose.setChecked(self.config_params["verbose"])
         self.advanced_verbose.stateChanged.connect(lambda state: self._update_param("verbose", None, state == Qt.CheckState.Checked))
@@ -488,8 +513,9 @@ class ConfigDialog(QDialog):
         
         # reset_init_mag - reset magnetization
         reset_layout = QHBoxLayout()
+        reset_layout.setSpacing(40)
         reset_label = QLabel("Reset Magnetization:")
-        reset_label.setFixedWidth(150)
+        reset_label.setFixedWidth(200)
         self.advanced_reset = QCheckBox()
         self.advanced_reset.setChecked(self.config_params["reset_init_mag"])
         self.advanced_reset.stateChanged.connect(lambda state: self._update_param("reset_init_mag", None, state == Qt.CheckState.Checked))
@@ -499,8 +525,9 @@ class ConfigDialog(QDialog):
         
         # scale - relative magnetization
         scale_layout = QHBoxLayout()
+        scale_layout.setSpacing(40)
         scale_label = QLabel("Relative Magnetization:")
-        scale_label.setFixedWidth(150)
+        scale_label.setFixedWidth(200)
         self.advanced_scale = QDoubleSpinBox()
         self.advanced_scale.setRange(0.1, 10.0)
         self.advanced_scale.setValue(self.config_params["scale"])
@@ -512,8 +539,9 @@ class ConfigDialog(QDialog):
         
         # max_pulse_samples - maximum number of samples
         samples_layout = QHBoxLayout()
+        samples_layout.setSpacing(40)
         samples_label = QLabel("Max. Pulse Samples:")
-        samples_label.setFixedWidth(150)
+        samples_label.setFixedWidth(200)
         self.advanced_samples = QSpinBox()
         self.advanced_samples.setRange(100, 5000)
         self.advanced_samples.setValue(self.config_params["max_pulse_samples"])
