@@ -4,9 +4,43 @@ from PyQt6.QtWidgets import (
     QComboBox, QMessageBox, QInputDialog, QFileDialog
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from pathlib import Path
 import yaml
 import os
+
+class IconButton(QPushButton):
+    """Ein einfacher Button mit Symbol (+/-) und optimiertem Styling"""
+    def __init__(self, text, tooltip, color, parent=None):
+        super().__init__(text, parent)
+        self.setFixedSize(24, 24)
+        self.setToolTip(tooltip)
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {color};
+                border: 1px solid #444444;
+                border-radius: 12px;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 0px;
+                margin: 0px;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                background-color: rgba({', '.join(str(int(c)) for c in self._hex_to_rgb(color))}, 0.1);
+                border: 1px solid {color};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba({', '.join(str(int(c)) for c in self._hex_to_rgb(color))}, 0.2);
+                border: 1px solid {color};
+            }}
+        """)
+    
+    def _hex_to_rgb(self, hex_color):
+        # Konvertiere Hex-Farbe zu RGB
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
 class ConfigDialog(QDialog):
     def __init__(self, config_params, parent=None):
@@ -314,8 +348,6 @@ class ConfigDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        # Setze fixe Fenstergröße
-        # self.setFixedSize(700, 500)
 
     def _create_water_pool_tab(self):
         """Creates the tab for water pool parameters"""
@@ -377,34 +409,44 @@ class ConfigDialog(QDialog):
         main_layout.setSpacing(16)
         main_layout.setContentsMargins(24, 24, 24, 24)
         
-        # Dropdown for selecting the CEST pool
+        # Pool selection layout with label, dropdown and +/- buttons
         pool_selection_layout = QHBoxLayout()
         pool_selection_layout.setSpacing(40)
+        
+        # Label
         pool_label = QLabel("CEST Pool:")
         pool_label.setFixedWidth(200)
+        pool_selection_layout.addWidget(pool_label)
+        
+        # Container for ComboBox and buttons
+        combo_buttons_container = QHBoxLayout()
+        combo_buttons_container.setSpacing(8)
+        combo_buttons_container.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        
+        # ComboBox
         self.cest_pool_selection = QComboBox()
+        self.cest_pool_selection.setMinimumWidth(160)
         self.cest_pool_selection.addItem("amide")
         self.cest_pool_selection.currentTextChanged.connect(self._update_cest_pool_display)
-        pool_selection_layout.addWidget(pool_label)
-        pool_selection_layout.addWidget(self.cest_pool_selection)
+        combo_buttons_container.addWidget(self.cest_pool_selection)
         
-        # Buttons for adding/removing pools
-        add_pool_btn = QPushButton("New Pool")
+        # Add Pool Button (+)
+        add_pool_btn = IconButton("+", "Add new pool", "#4CAF50")
         add_pool_btn.clicked.connect(self._add_cest_pool)
-        remove_pool_btn = QPushButton("Remove Pool")
+        
+        # Remove Pool Button (-)
+        remove_pool_btn = IconButton("-", "Remove selected pool", "#F44336")
         remove_pool_btn.clicked.connect(self._remove_cest_pool)
         
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        btn_layout.addWidget(add_pool_btn)
-        btn_layout.addSpacing(8)
-        btn_layout.addWidget(remove_pool_btn)
-        btn_layout.addStretch()
+        combo_buttons_container.addWidget(add_pool_btn)
+        combo_buttons_container.addWidget(remove_pool_btn)
+        combo_buttons_container.addStretch()
+        
+        # Add ComboBox and buttons to main layout
+        pool_selection_layout.addLayout(combo_buttons_container)
+        pool_selection_layout.addStretch()
         
         main_layout.addLayout(pool_selection_layout)
-        main_layout.addSpacing(16)  # Abstand zwischen ComboBox und Buttons
-        main_layout.addLayout(btn_layout)
-        main_layout.addSpacing(24)  # Größerer Abstand nach den Buttons
         
         # Container for pool parameters
         param_widget = QWidget()
