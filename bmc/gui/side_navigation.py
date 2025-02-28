@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QLabel,
     QFrame, QSizePolicy, QScrollArea, QButtonGroup, QHBoxLayout
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty, QEvent
 from PyQt6.QtGui import QIcon, QPainter, QColor, QLinearGradient, QPalette, QPen, QFont, QFontMetrics
 from pathlib import Path
 import os
@@ -227,10 +227,15 @@ class SideNavigation(QWidget):
         header_layout.setSpacing(0)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         
-        # Create and add the animated hamburger icon
-        self.hamburger_icon = HamburgerIcon()
+        # Erstelle einen besseren Hamburger-Button mit funktionierendem Hover-Effekt
         self.hamburger_btn = QPushButton()
-        self.hamburger_btn.setFixedSize(60, 48)  # Größerer Button
+        self.hamburger_btn.setFixedSize(60, 48)
+        
+        # Erstelle das Icon als Child-Widget des Buttons, aber mache es transparent für Mausevents
+        self.hamburger_icon = HamburgerIcon(self.hamburger_btn)
+        self.hamburger_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        
+        # Style für den Button mit Hover-Effekt, der das Icon nicht überdeckt
         self.hamburger_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -239,17 +244,15 @@ class SideNavigation(QWidget):
             }
             
             QPushButton:hover {
-                background-color: #383838;
+                background-color: rgba(56, 56, 56, 180);
             }
             
             QPushButton:pressed {
-                background-color: #404040;
+                background-color: rgba(64, 64, 64, 180);
             }
         """)
-        self.hamburger_btn.clicked.connect(self.toggleCollapse)
         
-        # Position the icon directly in the button without additional layout
-        self.hamburger_icon.setParent(self.hamburger_btn)
+        self.hamburger_btn.clicked.connect(self.toggleCollapse)
         
         header_layout.addWidget(self.hamburger_btn)
         layout.addWidget(header_frame)
@@ -412,6 +415,46 @@ class SideNavigation(QWidget):
         """Set the current selected page in the navigation."""
         if not self._updating and page_name in self.nav_buttons:
             self._on_button_clicked(page_name)
+    
+    def eventFilter(self, obj, event):
+        """Event-Filter zur Verarbeitung von Hover-Events für den Hamburger-Button"""
+        if event.type() == QEvent.Type.Enter:
+            # Mouse entered the widget area
+            if self.hamburger_btn and obj == self.hamburger_btn.parent():
+                self.hamburger_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #383838;
+                        border: none;
+                        padding: 0px;
+                    }
+                    
+                    QPushButton:pressed {
+                        background-color: #404040;
+                    }
+                """)
+                return True
+        elif event.type() == QEvent.Type.Leave:
+            # Mouse left the widget area
+            if self.hamburger_btn and obj == self.hamburger_btn.parent():
+                self.hamburger_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        border: none;
+                        padding: 0px;
+                    }
+                    
+                    QPushButton:hover {
+                        background-color: #383838;
+                    }
+                    
+                    QPushButton:pressed {
+                        background-color: #404040;
+                    }
+                """)
+                return True
+        
+        # Standard event processing
+        return super().eventFilter(obj, event)
     
     @pyqtProperty(int)
     def minimumWidth(self):
