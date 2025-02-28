@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QLabel,
     QFrame, QSizePolicy, QScrollArea, QButtonGroup, QHBoxLayout
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty, QEvent, QRect
 from PyQt6.QtGui import QIcon, QPainter, QColor, QLinearGradient, QPalette, QPen, QFont, QFontMetrics
 from pathlib import Path
 import os
@@ -157,7 +157,11 @@ class NavigationButton(QPushButton):
         # Create text label
         self._text_label = QLabel(self._text)
         self._text_label.setObjectName("text_label")  # Set object name for CSS-Selektoren
-        text_layout.addWidget(self._text_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        
+        # Zentrierte Ausrichtung des Textes im ausgeklappten Zustand
+        self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        text_layout.addWidget(self._text_label, 0, Qt.AlignmentFlag.AlignCenter)
         
         # Add containers to main layout
         self._layout.addWidget(self._icon_container)
@@ -207,35 +211,26 @@ class SideNavigation(QWidget):
         current_dir = Path(__file__).resolve().parent
         images_dir = current_dir / 'images'
         
-        # Create layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(1)
+        # Verwende ein absolutes Layout anstatt QVBoxLayout für die Hauptstruktur
+        self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().setSpacing(0)
         
-        # Header with hamburger menu button
-        header_frame = QFrame()
-        header_frame.setFixedHeight(48)  # Höher für bessere Bedienbarkeit
-        header_frame.setStyleSheet("""
+        # Erstelle einen festen Header-Container für den Hamburger-Button
+        self.header_frame = QFrame(self)
+        self.header_frame.setFixedHeight(48)
+        self.header_frame.setGeometry(0, 0, self.width(), 48)
+        self.header_frame.setStyleSheet("""
             QFrame {
                 background-color: #212121;
                 border: none;
             }
         """)
         
-        header_layout = QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(0)
-        header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        
-        # Erstelle einen besseren Hamburger-Button mit funktionierendem Hover-Effekt
-        self.hamburger_btn = QPushButton()
+        # Absolut positionierter Hamburger-Button
+        self.hamburger_btn = QPushButton(self.header_frame)
         self.hamburger_btn.setFixedSize(60, 48)
-        
-        # Erstelle das Icon als Child-Widget des Buttons, aber mache es transparent für Mausevents
-        self.hamburger_icon = HamburgerIcon(self.hamburger_btn)
-        self.hamburger_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        
-        # Style für den Button mit Hover-Effekt, der das Icon nicht überdeckt
+        self.hamburger_btn.setGeometry(0, 0, 60, 48)
         self.hamburger_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -251,11 +246,61 @@ class SideNavigation(QWidget):
                 background-color: rgba(64, 64, 64, 180);
             }
         """)
-        
         self.hamburger_btn.clicked.connect(self.toggleCollapse)
         
-        header_layout.addWidget(self.hamburger_btn)
-        layout.addWidget(header_frame)
+        # Absolut positioniertes Hamburger-Icon
+        self.hamburger_icon = HamburgerIcon(self.hamburger_btn)
+        self.hamburger_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        
+        # Erstelle ein Container-Widget für den BMC-Titel, das unabhängig vom Header-Frame existiert
+        self.title_container = QWidget(self)
+        self.title_container.setGeometry(60, 0, 140, 48)
+        self.title_container.setStyleSheet("background-color: #212121;")
+        
+        # BMC-Label im Titel-Container mit horizontalem Farbverlauf
+        self.title_label = QLabel("BMCSim", self.title_container)
+        self.title_label.setGeometry(0, 0, 140, 48)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setStyleSheet("""
+            QLabel {
+                color: #2962FF;
+                font-size: 20px;
+                font-weight: bold;
+                padding: 0px;
+                margin: 0px;
+                border: none;
+                letter-spacing: 1px;
+                background-color: transparent;
+            }
+        """)
+        
+        # Schatten für BMC-Label
+        self.shadow_label = QLabel("BMCSim", self.title_label)
+        self.shadow_label.setGeometry(1, 1, 140, 48)
+        self.shadow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.shadow_label.setStyleSheet("""
+            QLabel {
+                color: rgba(0, 0, 0, 60);
+                font-size: 20px;
+                font-weight: bold;
+                padding: 0px;
+                margin: 0px;
+                border: none;
+                letter-spacing: 1px;
+                background-color: transparent;
+            }
+        """)
+        self.shadow_label.lower()
+        
+        # Anfangs versteckt, wenn das Menü eingeklappt ist
+        self.title_container.setVisible(not self.collapsed)
+        
+        # Hauptcontainer für die Navigation unterhalb des Headers
+        content_container = QWidget(self)
+        content_container.setGeometry(0, 48, self.width(), self.height() - 48)
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(1)
         
         # Create a button group to manage exclusive selection
         self.button_group = QButtonGroup(self)
@@ -343,7 +388,7 @@ class SideNavigation(QWidget):
         self.nav_buttons["about"] = about_btn
         
         scroll_area.setWidget(nav_container)
-        layout.addWidget(scroll_area)
+        content_layout.addWidget(scroll_area)
         
         # Erstellen eines dedizierten rechten Border-Frames
         right_border = QFrame(self)
@@ -352,7 +397,15 @@ class SideNavigation(QWidget):
         right_border.setGeometry(self.width()-1, 0, 1, self.height())
         
         # Stellen Sie sicher, dass sich der Border bei Größenänderung anpasst
-        self.resizeEvent = lambda e: right_border.setGeometry(self.width()-1, 0, 1, self.height())
+        self.origResizeEvent = self.resizeEvent
+        
+        def newResizeEvent(event):
+            right_border.setGeometry(self.width()-1, 0, 1, self.height())
+            content_container.setGeometry(0, 48, self.width(), self.height() - 48)
+            if hasattr(self, 'origResizeEvent') and self.origResizeEvent:
+                self.origResizeEvent(event)
+        
+        self.resizeEvent = newResizeEvent
         
         # Set the sidebar's style with border on the right side (als Backup)
         self.setStyleSheet("""
@@ -392,6 +445,9 @@ class SideNavigation(QWidget):
         # Animate hamburger icon rotation
         self.hamburger_icon.animate_rotation(self.collapsed)
         
+        # Update title visibility - make sure it's visible when expanded
+        self.title_container.setVisible(not self.collapsed)
+        
         # Update navigation buttons
         for button in self.nav_buttons.values():
             button.collapsed = self.collapsed
@@ -418,42 +474,8 @@ class SideNavigation(QWidget):
     
     def eventFilter(self, obj, event):
         """Event-Filter zur Verarbeitung von Hover-Events für den Hamburger-Button"""
-        if event.type() == QEvent.Type.Enter:
-            # Mouse entered the widget area
-            if self.hamburger_btn and obj == self.hamburger_btn.parent():
-                self.hamburger_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #383838;
-                        border: none;
-                        padding: 0px;
-                    }
-                    
-                    QPushButton:pressed {
-                        background-color: #404040;
-                    }
-                """)
-                return True
-        elif event.type() == QEvent.Type.Leave:
-            # Mouse left the widget area
-            if self.hamburger_btn and obj == self.hamburger_btn.parent():
-                self.hamburger_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        border: none;
-                        padding: 0px;
-                    }
-                    
-                    QPushButton:hover {
-                        background-color: #383838;
-                    }
-                    
-                    QPushButton:pressed {
-                        background-color: #404040;
-                    }
-                """)
-                return True
-        
-        # Standard event processing
+        # Da wir jetzt einen Container für den hamburger-Button verwenden,
+        # ist das Event-Filter für den Hamburger-Button nicht mehr notwendig
         return super().eventFilter(obj, event)
     
     @pyqtProperty(int)
