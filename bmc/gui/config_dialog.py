@@ -13,19 +13,20 @@ class IconButton(QPushButton):
     """Ein einfacher Button mit Symbol (+/-) und optimiertem Styling"""
     def __init__(self, text, tooltip, color, parent=None):
         super().__init__(text, parent)
-        self.setFixedSize(24, 24)
+        self.setFixedSize(50, 50)  # Größere Buttons
         self.setToolTip(tooltip)
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 color: {color};
                 border: 1px solid #444444;
-                border-radius: 12px;
-                font-size: 14px;
+                border-radius: 10px;
+                font-size: 24px;  /* Größere Schrift */
                 font-weight: bold;
                 padding: 0px;
                 margin: 0px;
                 text-align: center;
+                padding-bottom: 4px; /* Korrigiert die vertikale Position */
             }}
             QPushButton:hover {{
                 background-color: rgba({', '.join(str(int(c)) for c in self._hex_to_rgb(color))}, 0.1);
@@ -421,7 +422,7 @@ class ConfigDialog(QDialog):
         # Container for ComboBox and buttons
         combo_buttons_container = QHBoxLayout()
         combo_buttons_container.setSpacing(8)
-        combo_buttons_container.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        combo_buttons_container.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Vertikale Zentrierung
         
         # ComboBox
         self.cest_pool_selection = QComboBox()
