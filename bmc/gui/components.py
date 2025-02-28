@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QLocale
 from PyQt6.QtGui import QIcon
 from pathlib import Path
 import sys
@@ -221,6 +221,9 @@ class TitledGroupBox(QWidget):
         # Entferne die Zentrierung der Box, die eine Hauptursache für den Abstand ist
         # Stattdessen links ausrichten (AlignLeft)
         layout.setAlignment(self.box, Qt.AlignmentFlag.AlignLeft)
+        
+        # Setze das Locale für alle QDoubleSpinBox-Widgets auf Englisch
+        self.locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
         
     # Überschreibe die resizeEvent-Methode, um die dynamische Breite anzupassen
     def resizeEvent(self, event):

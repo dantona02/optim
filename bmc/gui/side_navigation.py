@@ -70,14 +70,15 @@ class NavigationButton(QPushButton):
         self._text = text
         self._icon_path = icon_path
         self.collapsed = True
-        self.setMinimumHeight(48)  # Höhere Buttons für bessere Erkennbarkeit
+        self.setMinimumHeight(48)
         self.setCheckable(True)
         
         # Create a custom layout for the button content
         self._init_layout()
         
-        # Style for the button
+        # Style for the button - Erweiterte Version mit verbesserten Hover-Effekten
         self._default_style = """
+            /* Grundstil für den Button */
             QPushButton {
                 background-color: transparent;
                 color: #E0E0E0;
@@ -89,25 +90,41 @@ class NavigationButton(QPushButton):
                 text-align: left;
             }
             
+            /* Hover-Effekt für den Button selbst */
             QPushButton:hover {
                 background-color: #383838;
             }
             
+            /* Ausgewählter Button */
             QPushButton:checked {
                 background-color: #2D2D2D;
                 border-left: 3px solid #2962FF;
-                padding-left: 0px;
+            }
+            
+            /* Hover-Effekt für ausgewählten Button */
+            QPushButton:checked:hover {
+                background-color: #333333;
+            }
+            
+            /* Grundstil für Labels und Container */
+            #icon_container, #text_container, QLabel {
+                background-color: transparent;
             }
             
             QLabel {
                 color: #E0E0E0;
                 font-size: 14px;
                 font-weight: 500;
-                background-color: transparent;
             }
         """
-        super().setStyleSheet(self._default_style)
+        self.setStyleSheet(self._default_style)
         self.updateAppearance()
+        
+        # Event-Filter für die Container-Widgets installieren
+        self._icon_container.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._text_container.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._text_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     
     def _init_layout(self):
         """Initialize the custom layout for the button"""
@@ -117,17 +134,14 @@ class NavigationButton(QPushButton):
         
         # Container for the icon (fixed width of 60px)
         self._icon_container = QWidget()
+        self._icon_container.setObjectName("icon_container")  # Set object name for CSS-Selektoren
         self._icon_container.setFixedWidth(60)  # Breiter für größere Icons
-        self._icon_container.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-            }
-        """)
         icon_layout = QHBoxLayout(self._icon_container)
         icon_layout.setContentsMargins(0, 0, 0, 0)
         
         # Create icon label
         self._icon_label = QLabel()
+        self._icon_label.setObjectName("icon_label")  # Set object name for CSS-Selektoren
         self._icon_label.setFixedSize(QSize(26, 26))  # Größere Icons
         icon = QIcon(self._icon_path)
         pixmap = icon.pixmap(QSize(26, 26))  # Passend zur neuen Größe
@@ -136,17 +150,14 @@ class NavigationButton(QPushButton):
         
         # Container for the text
         self._text_container = QWidget()
-        self._text_container.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-            }
-        """)
+        self._text_container.setObjectName("text_container")  # Set object name for CSS-Selektoren
         text_layout = QHBoxLayout(self._text_container)
         text_layout.setContentsMargins(0, 0, 0, 0)
         
         # Create text label
         self._text_label = QLabel(self._text)
-        text_layout.addWidget(self._text_label, 0, Qt.AlignmentFlag.AlignCenter)
+        self._text_label.setObjectName("text_label")  # Set object name for CSS-Selektoren
+        text_layout.addWidget(self._text_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         # Add containers to main layout
         self._layout.addWidget(self._icon_container)
@@ -165,24 +176,9 @@ class NavigationButton(QPushButton):
         
         # Update margins based on checked state
         if self.isChecked():
-            self._icon_container.setContentsMargins(3, 0, 0, 0)
-            self._updateStyle(True)
+            self._layout.setContentsMargins(3, 0, 0, 0)
         else:
-            self._icon_container.setContentsMargins(0, 0, 0, 0)
-            self._updateStyle(False)
-    
-    def _updateStyle(self, is_checked):
-        """Update the style without causing recursion"""
-        if is_checked:
-            style = self._default_style + """
-                QPushButton {
-                    background-color: #2D2D2D;
-                    border-left: 3px solid #2962FF;
-                }
-            """
-        else:
-            style = self._default_style
-        super().setStyleSheet(style)
+            self._layout.setContentsMargins(0, 0, 0, 0)
     
     def setChecked(self, checked):
         """Override setChecked to update the visual style"""
@@ -326,17 +322,17 @@ class SideNavigation(QWidget):
         nav_layout.addWidget(animation_btn)
         self.nav_buttons["animation"] = animation_btn
         
-        # Settings button
+        # Add stretch before the bottom buttons to push them to bottom
+        nav_layout.addStretch()
+        
+        # Settings button at the bottom before About
         settings_btn = NavigationButton(str(images_dir / 'settings.png'), "Settings")
         self.button_group.addButton(settings_btn)
         settings_btn.clicked.connect(lambda: self._on_button_clicked("settings"))
         nav_layout.addWidget(settings_btn)
         self.nav_buttons["settings"] = settings_btn
         
-        # Add stretch before the about button to push it to bottom
-        nav_layout.addStretch()
-        
-        # About button at the bottom
+        # About button at the very bottom
         about_btn = NavigationButton(str(images_dir / 'information.png'), "About")
         self.button_group.addButton(about_btn)
         about_btn.clicked.connect(lambda: self._on_button_clicked("about"))
@@ -376,12 +372,10 @@ class SideNavigation(QWidget):
             for name, button in self.nav_buttons.items():
                 if name != page_name:
                     button.setChecked(False)
-                    button._updateStyle(False)
             
             # Aktiviere den ausgewählten Button
             self.current_button = self.nav_buttons[page_name]
             self.current_button.setChecked(True)
-            self.current_button._updateStyle(True)
             
             # Emit navigation signal
             self.navigationChanged.emit(page_name)

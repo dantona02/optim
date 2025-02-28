@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QFileDialog, QSpinBox, QDoubleSpinBox, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QLocale
 from pathlib import Path
 
 from bmc.gui.components import TitledGroupBox, AnimatedProgressBar
@@ -22,6 +22,8 @@ class ControlPanel(QWidget):
         super().__init__(parent)
         self.seq_path = None
         self.config_path = None
+        # Setze das Locale für QDoubleSpinBox-Widgets auf Englisch
+        self.locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
         self.setup_ui()
         
     def setup_ui(self):
@@ -147,6 +149,7 @@ class ControlPanel(QWidget):
         adc_label = QLabel("ADC Time [ms]:")
         adc_label.setFixedWidth(150)
         self.adc_time = QDoubleSpinBox()
+        self.adc_time.setLocale(self.locale)  # Setze Englisches Locale
         self.adc_time.setRange(0.1, 100.0)
         self.adc_time.setValue(5.0)
         self.adc_time.setSingleStep(0.1)

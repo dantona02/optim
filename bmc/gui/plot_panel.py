@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget
+    QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox
 )
+from PyQt6.QtCore import QLocale
 import matplotlib
 matplotlib.use('QtAgg')  # Use QtAgg for PyQt6
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -13,6 +14,8 @@ class PlotPanel(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Setze das Locale für alle QDoubleSpinBox-Widgets auf Englisch
+        self.locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
         self.setup_ui()
         
     def setup_ui(self):
