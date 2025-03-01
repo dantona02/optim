@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QFileDialog, QSlider, QComboBox, QToolButton,
     QFrame, QListView
 )
-from PyQt6.QtCore import Qt, QUrl, QTimer, QSize, QEvent
+from PyQt6.QtCore import Qt, QUrl, QTimer, QSize
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtGui import QPixmap, QImage, QIcon, QColor, QStandardItemModel, QStandardItem
@@ -298,7 +298,7 @@ class VideoPanel(QWidget):
         )
         media_controls_layout.addWidget(self.forward_btn)
         
-        # Speed control mit der neuen CustomSpeedComboBox
+        # Speed control mit CustomSpeedComboBox
         self.speed_combo = CustomSpeedComboBox()
         self.speed_combo.addItems(["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"])
         self.speed_combo.setCurrentIndex(2)  # 1.0x default
