@@ -218,52 +218,44 @@ class VideoPanel(QWidget):
         )
         media_controls_layout.addWidget(self.forward_btn)
         
-        time_controls_layout.addLayout(media_controls_layout)
-        time_controls_layout.addStretch(1)
-        
-        # Right controls group
-        right_controls_layout = QHBoxLayout()
-        right_controls_layout.setSpacing(15)
-        
-        # Speed control with minimalistic styling
-        speed_layout = QHBoxLayout()
-        speed_layout.setSpacing(6)
-        speed_label = QLabel("Speed:")
-        # Hintergrund transparent machen
-        speed_label.setStyleSheet("color: white; font-size: 13px; background: transparent;")
+        # Speed control button with SVG icon - positioned directly after Forward button
         self.speed_combo = QComboBox()
         self.speed_combo.addItems(["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"])
         self.speed_combo.setCurrentIndex(2)  # 1.0x default
         self.speed_combo.setEnabled(False)
+        self.speed_combo.setToolTip("Playback Speed")
         
-        # Minimalistischeres Design für das Dropdown-Menü
-        self.speed_combo.setStyleSheet("""
-            QComboBox {
+        # Minimalistisches Apple-style Design für das Dropdown-Menü
+        self.speed_combo.setStyleSheet(f"""
+            QComboBox {{
                 background-color: transparent;
-                color: white;
+                color: transparent;
                 border: none;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.3);
                 border-radius: 0px;
-                padding: 3px 8px;
-                min-width: 65px;
-                font-weight: normal;
-                selection-background-color: transparent;
-            }
-            QComboBox:hover {
-                border-bottom: 1px solid rgba(255, 255, 255, 0.7);
-            }
-            QComboBox::drop-down {
+                padding: 3px;
+                min-width: 28px;
+                max-width: 28px;
+                margin-left: 6px;
+            }}
+            QComboBox:hover {{
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 10px;
+            }}
+            QComboBox:pressed {{
+                background: rgba(255, 255, 255, 0.25);
+            }}
+            QComboBox::drop-down {{
                 border: none;
-                width: 14px;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                width: 8px;
-                height: 8px;
-                background: rgba(255, 255, 255, 0.7);
-                border-radius: 1px;
-            }
-            QComboBox QAbstractItemView {
+                width: 28px;
+                subcontrol-origin: padding;
+                subcontrol-position: center;
+            }}
+            QComboBox::down-arrow {{
+                image: url("{os.path.join(os.path.dirname(__file__), "down.svg")}");
+                width: 16px;
+                height: 16px;
+            }}
+            QComboBox QAbstractItemView {{
                 background-color: rgba(30, 30, 30, 0.95);
                 color: white;
                 selection-background-color: rgba(66, 135, 245, 0.5);
@@ -271,16 +263,22 @@ class VideoPanel(QWidget):
                 border: none;
                 outline: none;
                 padding: 3px;
-            }
-            QComboBox QAbstractItemView::item {
+            }}
+            QComboBox QAbstractItemView::item {{
+                color: white;
                 min-height: 22px;
                 padding: 2px 6px;
-            }
+            }}
         """)
         self.speed_combo.currentIndexChanged.connect(self.speed_changed)
-        speed_layout.addWidget(speed_label)
-        speed_layout.addWidget(self.speed_combo)
-        right_controls_layout.addLayout(speed_layout)
+        media_controls_layout.addWidget(self.speed_combo)
+        
+        time_controls_layout.addLayout(media_controls_layout)
+        time_controls_layout.addStretch(1)
+        
+        # Right controls group
+        right_controls_layout = QHBoxLayout()
+        right_controls_layout.setSpacing(15)
         
         # Download button
         self.download_btn = create_svg_icon_button(
