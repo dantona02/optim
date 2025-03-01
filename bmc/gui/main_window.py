@@ -20,6 +20,9 @@ from bmc.gui.plot_panel import PlotPanel
 from bmc.gui.config_dialog import ConfigDialog
 from bmc.gui.side_navigation import SideNavigation
 from bmc.gui.about_page import AboutPage
+from bmc.gui.animation_control_panel import AnimationControlPanel
+from bmc.gui.video_panel import VideoPanel
+from bmc.gui.animation_worker import AnimationWorker
 
 
 class SimulationWorker(QThread):
@@ -120,7 +123,9 @@ class BMCSimulatorGUI(QMainWindow):
         self.current_seq = None
         self.config_params = {}
         self.simulation_thread = None
+        self.animation_thread = None
         self.temp_config_path = None
+        self.latest_video_path = None
         
         # Load default configuration values
         self._load_default_config()
@@ -201,14 +206,33 @@ class BMCSimulatorGUI(QMainWindow):
         main_page_layout.setStretch(0, 0)  # Control panel - no stretch
         main_page_layout.setStretch(1, 1)  # Plot panel - should stretch
         
-        # Create other pages
+        # Create animation page
+        self.animation_page = QWidget()
+        animation_layout = QHBoxLayout(self.animation_page)
+        animation_layout.setContentsMargins(12, 12, 12, 12)
+        animation_layout.setSpacing(12)
+        
+        # Create animation control panel
+        self.animation_control_panel = AnimationControlPanel()
+        self.animation_control_panel.setFixedWidth(420)  # Fixed width
+        
+        # Connect animation control panel signals
+        self.animation_control_panel.startAnimationClicked.connect(self._run_animation)
+        self.animation_control_panel.saveVideoClicked.connect(self._save_video)
+        
+        # Create video panel for animation page
+        self.video_panel = VideoPanel()
+        
+        # Add panels to animation page layout
+        animation_layout.addWidget(self.animation_control_panel)
+        animation_layout.addWidget(self.video_panel)
+        animation_layout.setStretch(0, 0)  # Control panel - no stretch
+        animation_layout.setStretch(1, 1)  # Video panel - should stretch
+        
+        # Create placeholders for other pages
         self.pulseseq_page = QWidget()
         pulseseq_layout = QHBoxLayout(self.pulseseq_page)
         pulseseq_layout.addWidget(QWidget())  # Placeholder
-        
-        self.animation_page = QWidget()
-        animation_layout = QHBoxLayout(self.animation_page)
-        animation_layout.addWidget(QWidget())  # Placeholder
         
         self.settings_page = QWidget()
         settings_layout = QHBoxLayout(self.settings_page)
@@ -218,8 +242,8 @@ class BMCSimulatorGUI(QMainWindow):
         
         # Add pages to stack
         self.stack.addWidget(self.main_page)
-        self.stack.addWidget(self.pulseseq_page)
         self.stack.addWidget(self.animation_page)
+        self.stack.addWidget(self.pulseseq_page)
         self.stack.addWidget(self.settings_page)
         self.stack.addWidget(self.about_page)
         
@@ -232,9 +256,9 @@ class BMCSimulatorGUI(QMainWindow):
     def _on_navigation_changed(self, page_name):
         """Handle navigation changes"""
         page_index = {
-            "simulation": 0,  # Geändert von "main" zu "simulation"
-            "pulseseq": 1,
-            "animation": 2,
+            "simulation": 0,
+            "animation": 1,
+            "pulseseq": 2,
             "settings": 3,
             "about": 4
         }.get(page_name, 0)
@@ -242,6 +266,10 @@ class BMCSimulatorGUI(QMainWindow):
         # Setze den korrekten Index und stelle sicher, dass der Button aktiv bleibt
         self.stack.setCurrentIndex(page_index)
         self.side_nav.setCurrentPage(page_name)
+        
+        # Update animation panel with current sequence if available
+        if page_name == "animation" and self.sim_engine is not None and self.current_seq:
+            self.animation_control_panel.set_sequence_info(self.current_seq)
         
     def _load_default_config(self):
         """Load default values for configuration"""
@@ -287,6 +315,10 @@ class BMCSimulatorGUI(QMainWindow):
             
         self.current_seq = filename
         self._check_start_enabled()
+        
+        # Update animation control panel if we're on the animation page
+        if self.stack.currentIndex() == 1 and self.sim_engine is not None:
+            self.animation_control_panel.set_sequence_info(filename)
             
     def _load_config(self, filename=None):
         if not filename:
@@ -366,6 +398,10 @@ class BMCSimulatorGUI(QMainWindow):
         self.control_panel.enable_save_button(True)
         self.control_panel.enable_controls(True)
         
+        # Update animation control panel with sequence info
+        if self.current_seq:
+            self.animation_control_panel.set_sequence_info(self.current_seq)
+        
         # Clean up
         self._cleanup_temp_file()
     
@@ -387,6 +423,64 @@ class BMCSimulatorGUI(QMainWindow):
                 self.temp_config_path = None
             except Exception as e:
                 print(f"Could not delete temporary file: {e}")
+
+    def _run_animation(self, animation_params):
+        """Run animation with the specified parameters."""
+        if not self.sim_engine:
+            QMessageBox.warning(self, "No Simulation Data", "Please run a simulation first.")
+            return
+        
+        # Stop any ongoing animation
+        if self.animation_thread and self.animation_thread.isRunning():
+            self.animation_thread.terminate()
+            self.animation_thread.wait()
+        
+        # Update UI status before animation
+        self.animation_control_panel.enable_controls(False)
+        self.animation_control_panel.set_status("Starting animation...")
+        
+        # Create animation thread
+        self.animation_thread = AnimationWorker(
+            sim_engine=self.sim_engine,
+            animation_params=animation_params
+        )
+        
+        # Connect signals from worker
+        self.animation_thread.progress_updated.connect(self.animation_control_panel.update_progress)
+        self.animation_thread.status_updated.connect(self.animation_control_panel.set_status)
+        self.animation_thread.animation_completed.connect(self._animation_finished)
+        self.animation_thread.error_occurred.connect(self._animation_error)
+        
+        # Start the thread
+        self.animation_thread.start()
+    
+    @pyqtSlot(str)
+    def _animation_finished(self, video_path):
+        """Handle successful animation completion."""
+        # Store the video path
+        self.latest_video_path = video_path
+        
+        # Update UI status
+        self.animation_control_panel.set_status("Animation completed successfully", is_success=True)
+        self.animation_control_panel.enable_controls(True)
+        self.animation_control_panel.enable_save_button(True)
+        
+        # Set the video in the video panel
+        self.video_panel.set_video(video_path)
+    
+    @pyqtSlot(str)
+    def _animation_error(self, error_message):
+        """Handle animation errors."""
+        self.animation_control_panel.set_status(f"Error: {error_message[:100]}...", is_error=True)
+        self.animation_control_panel.enable_controls(True)
+        print(f"Animation error: {error_message}")
+    
+    def _save_video(self):
+        """Save the current animation video."""
+        if self.latest_video_path and os.path.exists(self.latest_video_path):
+            self.video_panel.download_video()
+        else:
+            QMessageBox.warning(self, "No Video Available", "No animation video available to save.")
         
     def _save_results(self):
         """Save simulation results to a file"""
@@ -420,6 +514,11 @@ class BMCSimulatorGUI(QMainWindow):
         if self.simulation_thread and self.simulation_thread.isRunning():
             self.simulation_thread.terminate()
             self.simulation_thread.wait()
+        
+        # Stop any ongoing animation
+        if self.animation_thread and self.animation_thread.isRunning():
+            self.animation_thread.terminate()
+            self.animation_thread.wait()
         
         # Clean up temporary files
         self._cleanup_temp_file()
