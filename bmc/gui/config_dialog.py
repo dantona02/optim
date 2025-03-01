@@ -442,7 +442,15 @@ class ConfigDialog(QDialog):
         # ComboBox
         self.cest_pool_selection = QComboBox()
         # self.cest_pool_selection.setMinimumWidth(160)
-        self.cest_pool_selection.addItem("amide")
+        
+        # Füge alle vorhandenen CEST-Pools aus der Konfiguration hinzu
+        if "cest_pool" in self.config_params and self.config_params["cest_pool"]:
+            for pool_name in self.config_params["cest_pool"].keys():
+                self.cest_pool_selection.addItem(pool_name)
+        else:
+            # Falls keine Pools vorhanden sind, füge Standard-Pool hinzu
+            self.cest_pool_selection.addItem("amide")
+        
         self.cest_pool_selection.currentTextChanged.connect(self._update_cest_pool_display)
         combo_buttons_container.addWidget(self.cest_pool_selection)
         

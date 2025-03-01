@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 import numpy as np
 import torch
 import tempfile
+import copy  # Import copy-Modul für deepcopy
 
 from bmc.fid.engine import BMCSim
 from bmc.set_params import load_params
@@ -271,11 +272,13 @@ class BMCSimulatorGUI(QMainWindow):
 
     def _open_config_dialog(self):
         """Opens the configuration dialog"""
-        dialog = ConfigDialog(self.config_params, self)
+        # Erstelle eine tiefe Kopie der Konfigurationsparameter, damit Änderungen
+        # vollständig übernommen werden können, einschließlich verschachtelter Dictionaries
+        dialog = ConfigDialog(copy.deepcopy(self.config_params), self)
         if dialog.exec():
-            # Update configuration if OK was clicked
+            # Übernimm die vollständige neue Konfiguration
             self.config_params = dialog.get_config()
-            # Show that dynamic configuration is being used
+            # Zeige an, dass eine dynamische Konfiguration verwendet wird
             self.control_panel.set_config_loaded("Dynamic configuration")
             
     def _load_sequence(self, filename=None):
