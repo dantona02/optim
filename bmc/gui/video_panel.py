@@ -127,20 +127,20 @@ class VideoPanel(QWidget):
         time_controls_layout.setContentsMargins(0, 0, 0, 0)
         time_controls_layout.setSpacing(15)
         
-        # Time display
+        # Time display - Hintergrund transparent
         self.time_label = QLabel("00:00 / 00:00")
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.time_label.setStyleSheet("color: white; font-size: 13px; font-weight: 500;")
+        self.time_label.setStyleSheet("color: white; font-size: 13px; font-weight: 500; background: transparent;")
         time_controls_layout.addWidget(self.time_label)
         
         time_controls_layout.addStretch(1)
         
         # Media controls in center - use a nested layout
         media_controls_layout = QHBoxLayout()
-        media_controls_layout.setSpacing(30)  # Increased spacing between controls
+        media_controls_layout.setSpacing(1)  # Etwas verringerten Abstand zwischen Kontrollelementen
         
         # Function to create icon buttons with custom colors
-        def create_svg_icon_button(icon_path, icon_size, tooltip, callback):
+        def create_svg_icon_button(icon_path, icon_size, tooltip, callback, is_play_button=False):
             button = QToolButton()
             # Set up icon with white color
             icon = self.create_white_icon(icon_path)
@@ -148,65 +148,71 @@ class VideoPanel(QWidget):
             button.setIconSize(QSize(*icon_size))
             button.setToolTip(tooltip)
             button.setEnabled(False)
-            button.setStyleSheet("""
-                QToolButton {
-                    border: none;
-                    background: transparent;
-                    padding: 8px;
-                }
-                QToolButton:hover {
-                    background: rgba(255, 255, 255, 0.15);
-                    border-radius: 20px;
-                }
-                QToolButton:pressed {
-                    background: rgba(255, 255, 255, 0.25);
-                }
-                QToolButton:disabled {
-                    opacity: 0.4;
-                }
-            """)
+            
+            # Angepasstes Styling mit kleinerem Hover-Radius
+            if is_play_button:
+                button.setStyleSheet("""
+                    QToolButton {
+                        border: none;
+                        background: transparent;
+                        padding: 6px;
+                    }
+                    QToolButton:hover {
+                        background: rgba(255, 255, 255, 0.15);
+                        border-radius: 12px;
+                    }
+                    QToolButton:pressed {
+                        background: rgba(255, 255, 255, 0.25);
+                    }
+                    QToolButton:disabled {
+                        opacity: 0.4;
+                    }
+                """)
+            else:
+                button.setStyleSheet("""
+                    QToolButton {
+                        border: none;
+                        background: transparent;
+                        padding: 6px;
+                    }
+                    QToolButton:hover {
+                        background: rgba(255, 255, 255, 0.15);
+                        border-radius: 10px;
+                    }
+                    QToolButton:pressed {
+                        background: rgba(255, 255, 255, 0.25);
+                    }
+                    QToolButton:disabled {
+                        opacity: 0.4;
+                    }
+                """)
+            
             button.clicked.connect(callback)
             return button
         
         # Rewind button
         self.rewind_btn = create_svg_icon_button(
             os.path.join(os.path.dirname(__file__), "images/backward.svg"),
-            (26, 26),  # Slightly larger icons
+            (22, 22),  # Etwas kleinere Icons
             "Rewind 5 seconds",
             self.rewind_video
         )
         media_controls_layout.addWidget(self.rewind_btn)
         
-        # Play button
+        # Play button - kleiner gemacht
         self.play_btn = create_svg_icon_button(
             os.path.join(os.path.dirname(__file__), "images/play.svg"),
-            (36, 36),  # Larger play button
+            (22, 22),  # Kleinerer Play-Button
             "Play",
-            self.play_pause_video
+            self.play_pause_video,
+            is_play_button=True
         )
-        self.play_btn.setStyleSheet("""
-            QToolButton {
-                border: none;
-                background: transparent;
-                padding: 10px;
-            }
-            QToolButton:hover {
-                background: rgba(255, 255, 255, 0.15);
-                border-radius: 25px;
-            }
-            QToolButton:pressed {
-                background: rgba(255, 255, 255, 0.25);
-            }
-            QToolButton:disabled {
-                opacity: 0.4;
-            }
-        """)
         media_controls_layout.addWidget(self.play_btn)
         
         # Forward button
         self.forward_btn = create_svg_icon_button(
             os.path.join(os.path.dirname(__file__), "images/forward.svg"),
-            (26, 26),  # Slightly larger icons
+            (22, 22),  # Etwas kleinere Icons
             "Forward 5 seconds",
             self.forward_video
         )
@@ -219,42 +225,56 @@ class VideoPanel(QWidget):
         right_controls_layout = QHBoxLayout()
         right_controls_layout.setSpacing(15)
         
-        # Speed control with modern styling
+        # Speed control with minimalistic styling
         speed_layout = QHBoxLayout()
         speed_layout.setSpacing(6)
         speed_label = QLabel("Speed:")
-        speed_label.setStyleSheet("color: white; font-size: 13px;")
+        # Hintergrund transparent machen
+        speed_label.setStyleSheet("color: white; font-size: 13px; background: transparent;")
         self.speed_combo = QComboBox()
         self.speed_combo.addItems(["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"])
         self.speed_combo.setCurrentIndex(2)  # 1.0x default
         self.speed_combo.setEnabled(False)
+        
+        # Minimalistischeres Design für das Dropdown-Menü
         self.speed_combo.setStyleSheet("""
             QComboBox {
-                background-color: rgba(60, 60, 60, 0.7);
+                background-color: transparent;
                 color: white;
-                border: 1px solid rgba(80, 80, 80, 0.5);
-                border-radius: 5px;
-                padding: 4px 10px;
-                min-width: 75px;
-                font-weight: 500;
+                border: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 0px;
+                padding: 3px 8px;
+                min-width: 65px;
+                font-weight: normal;
+                selection-background-color: transparent;
+            }
+            QComboBox:hover {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.7);
             }
             QComboBox::drop-down {
                 border: none;
-                width: 20px;
+                width: 14px;
             }
             QComboBox::down-arrow {
                 image: none;
-                width: 10px;
-                height: 10px;
+                width: 8px;
+                height: 8px;
                 background: rgba(255, 255, 255, 0.7);
-                border-radius: 2px;
+                border-radius: 1px;
             }
             QComboBox QAbstractItemView {
-                background-color: #333333;
+                background-color: rgba(30, 30, 30, 0.95);
                 color: white;
-                selection-background-color: #4287f5;
-                border: 1px solid #555555;
-                border-radius: 0px;
+                selection-background-color: rgba(66, 135, 245, 0.5);
+                selection-color: white;
+                border: none;
+                outline: none;
+                padding: 3px;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 22px;
+                padding: 2px 6px;
             }
         """)
         self.speed_combo.currentIndexChanged.connect(self.speed_changed)
@@ -265,7 +285,7 @@ class VideoPanel(QWidget):
         # Download button
         self.download_btn = create_svg_icon_button(
             os.path.join(os.path.dirname(__file__), "images/download.svg"),
-            (22, 22),
+            (20, 20),
             "Download Video",
             self.download_video
         )
