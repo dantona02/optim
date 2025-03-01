@@ -89,6 +89,13 @@ class CustomSpeedComboBox(QComboBox):
         # Leere die Texte für alle Items
         for i in range(self._model.rowCount()):
             self._model.item(i).setText("")
+            
+    def setEnabled(self, enabled):
+        """Überschreibe setEnabled um das Styling des Dropdownpfeils zu aktualisieren."""
+        super().setEnabled(enabled)
+        # Manuelle Aktualisierung des Styles
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 class VideoPanel(QWidget):
     """A class representing the video panel in the BMC Simulator GUI."""
@@ -316,17 +323,19 @@ class VideoPanel(QWidget):
         self.speed_combo.setEnabled(False)
         self.speed_combo.setToolTip("Playback Speed")
         
-        # Set down arrow icon with disabled state
+        # Erstelle einen dunkleren SVG-Pfeil für den deaktivierten Zustand
+        self.create_disabled_arrow_svg()
+        
+        # Set down arrow icon with different styles for enabled/disabled states
         self.speed_combo.setStyleSheet(self.speed_combo.styleSheet() + f"""
             QComboBox::down-arrow {{
-                image: url("{os.path.join(os.path.dirname(__file__), "down.svg")}");
                 width: 16px;
                 height: 16px;
             }}
-            QComboBox::down-arrow:disabled {{
-                opacity: 0.4;
-            }}
         """)
+        
+        # Setze Pfeil basierend auf aktuellem Zustand
+        self.update_dropdown_arrow(False)
         
         self.speed_combo.currentIndexChanged.connect(self.speed_changed)
         media_controls_layout.addWidget(self.speed_combo)
@@ -369,6 +378,39 @@ class VideoPanel(QWidget):
             }
         """)
     
+    def create_disabled_arrow_svg(self):
+        """Erstellt eine dunklere Version des Dropdown-Pfeils für den deaktivierten Zustand."""
+        # Pfade für die SVG-Dateien
+        self.down_arrow_path = os.path.join(os.path.dirname(__file__), "down.svg")
+        self.down_arrow_disabled_path = os.path.join(os.path.dirname(__file__), "down_disabled.svg")
+        
+        # Erstellt die deaktivierte Version, wenn sie noch nicht existiert
+        if not os.path.exists(self.down_arrow_disabled_path):
+            try:
+                with open(self.down_arrow_path, 'r') as file:
+                    svg_content = file.read()
+                
+                # Ersetze die weiße Farbe durch eine dunklere Farbe mit Transparenz
+                disabled_svg = svg_content.replace('fill="#ffffff"', 'fill="#ffffff" opacity="0.4"')
+                
+                with open(self.down_arrow_disabled_path, 'w') as file:
+                    file.write(disabled_svg)
+            except Exception as e:
+                print(f"Fehler beim Erstellen der deaktivierten SVG: {e}")
+                # Fallback: Verwenden Sie das normale SVG für beide Zustände
+                self.down_arrow_disabled_path = self.down_arrow_path
+    
+    def update_dropdown_arrow(self, enabled):
+        """Aktualisiert das Dropdown-Pfeil-Icon basierend auf dem Aktivierungsstatus."""
+        arrow_path = self.down_arrow_path if enabled else self.down_arrow_disabled_path
+        self.speed_combo.setStyleSheet(self.speed_combo.styleSheet().split("QComboBox::down-arrow {")[0] + f"""
+            QComboBox::down-arrow {{
+                image: url("{arrow_path}");
+                width: 16px;
+                height: 16px;
+            }}
+        """)
+    
     def create_white_icon(self, icon_path):
         """Create white colored SVG icon from the original SVG file."""
         if icon_path.lower().endswith('.svg'):
@@ -396,6 +438,7 @@ class VideoPanel(QWidget):
             self.rewind_btn.setEnabled(True)
             self.forward_btn.setEnabled(True)
             self.speed_combo.setEnabled(True)
+            self.update_dropdown_arrow(True)  # Aktualisiere den Dropdown-Pfeil
             self.position_slider.setEnabled(True)
             self.download_btn.setEnabled(True)
             self.time_label.setProperty("enabled", True)
@@ -419,6 +462,7 @@ class VideoPanel(QWidget):
         self.rewind_btn.setEnabled(False)
         self.forward_btn.setEnabled(False)
         self.speed_combo.setEnabled(False)
+        self.update_dropdown_arrow(False)  # Aktualisiere den Dropdown-Pfeil
         self.position_slider.setEnabled(False)
         self.download_btn.setEnabled(False)
         self.time_label.setProperty("enabled", False)
