@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QWidget, QTabWidget,
     QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox,
-    QComboBox, QMessageBox, QInputDialog, QFileDialog
+    QComboBox, QMessageBox, QInputDialog, QFileDialog, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -13,20 +13,29 @@ class IconButton(QPushButton):
     """Ein einfacher Button mit Symbol (+/-) und optimiertem Styling"""
     def __init__(self, text, tooltip, color, parent=None):
         super().__init__(text, parent)
-        self.setFixedSize(50, 50)  # Größere Buttons
+        self.setFixedSize(72, 40)  # Quadratische Buttons
+        self.setMaximumSize(72, 40)  # Verhindert Überdehnung
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # Fixierte Größenpolitik
         self.setToolTip(tooltip)
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 color: {color};
                 border: 1px solid #444444;
-                border-radius: 10px;
-                font-size: 24px;  /* Größere Schrift */
+                border-radius: 6px;  /* Angepasster Radius für kleinere Buttons */
+                font-size: 30px;  /* Kleinere Schrift */
                 font-weight: bold;
                 padding: 0px;
                 margin: 0px;
                 text-align: center;
-                padding-bottom: 4px; /* Korrigiert die vertikale Position */
+                padding-bottom: 2px; /* Kleinere Korrektur der vertikalen Position */
+                width: 72px;
+                height: 40px;
+                min-width: 72px;
+                min-height: 40px;
+                max-width: 72px;
+                max-height: 40px;
+                padding-bottom: 4px;
             }}
             QPushButton:hover {{
                 background-color: rgba({', '.join(str(int(c)) for c in self._hex_to_rgb(color))}, 0.1);
@@ -75,6 +84,7 @@ class ConfigDialog(QDialog):
                 padding: 5px 8px;
                 padding-right: 20px;  /* Mehr Platz für die größeren Buttons */
                 min-width: 100px;
+                max-width: 400px;
                 min-height: 32px;
                 font-size: 13px;
             }}
@@ -361,7 +371,7 @@ class ConfigDialog(QDialog):
         f_layout = QHBoxLayout()
         f_layout.setSpacing(40)
         f_label = QLabel("Relative Pool Size (f):")
-        f_label.setFixedWidth(200)
+        f_label.setFixedWidth(180)
         self.water_f = QDoubleSpinBox()
         self.water_f.setRange(0.1, 10.0)
         self.water_f.setValue(self.config_params["water_pool"]["f"])
@@ -375,7 +385,7 @@ class ConfigDialog(QDialog):
         t1_layout = QHBoxLayout()
         t1_layout.setSpacing(40)
         t1_label = QLabel("T1 [s]:")
-        t1_label.setFixedWidth(200)
+        t1_label.setFixedWidth(180)
         self.water_t1 = QDoubleSpinBox()
         self.water_t1.setRange(0.1, 10.0)
         self.water_t1.setValue(self.config_params["water_pool"]["t1"])
@@ -389,7 +399,7 @@ class ConfigDialog(QDialog):
         t2_layout = QHBoxLayout()
         t2_layout.setSpacing(40)
         t2_label = QLabel("T2 [s]:")
-        t2_label.setFixedWidth(200)
+        t2_label.setFixedWidth(180)
         self.water_t2 = QDoubleSpinBox()
         self.water_t2.setRange(0.001, 5.0)
         self.water_t2.setValue(self.config_params["water_pool"]["t2"])
@@ -412,24 +422,35 @@ class ConfigDialog(QDialog):
         
         # Pool selection layout with label, dropdown and +/- buttons
         pool_selection_layout = QHBoxLayout()
-        pool_selection_layout.setSpacing(40)
+        pool_selection_layout.setSpacing(52)
         
         # Label
         pool_label = QLabel("CEST Pool:")
-        pool_label.setFixedWidth(200)
+        pool_label.setFixedWidth(180)
+        pool_label.setStyleSheet("padding-left: 8px;")
+        # pool_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         pool_selection_layout.addWidget(pool_label)
         
         # Container for ComboBox and buttons
-        combo_buttons_container = QHBoxLayout()
+        combo_buttons_widget = QWidget()
+        combo_buttons_container = QHBoxLayout(combo_buttons_widget)
         combo_buttons_container.setSpacing(8)
-        combo_buttons_container.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Vertikale Zentrierung
+        combo_buttons_container.setContentsMargins(0, 0, 0, 0)
+        # combo_buttons_container.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         # ComboBox
         self.cest_pool_selection = QComboBox()
-        self.cest_pool_selection.setMinimumWidth(160)
+        # self.cest_pool_selection.setMinimumWidth(160)
         self.cest_pool_selection.addItem("amide")
         self.cest_pool_selection.currentTextChanged.connect(self._update_cest_pool_display)
         combo_buttons_container.addWidget(self.cest_pool_selection)
+        
+        # Buttons container to force layout
+        button_container = QWidget()
+        button_container.setFixedWidth(180)  # Genug Platz für beide Buttons mit Abstand
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setSpacing(8)
+        button_layout.setContentsMargins(0, 0, 0, 0)
         
         # Add Pool Button (+)
         add_pool_btn = IconButton("+", "Add new pool", "#4CAF50")
@@ -439,12 +460,12 @@ class ConfigDialog(QDialog):
         remove_pool_btn = IconButton("-", "Remove selected pool", "#F44336")
         remove_pool_btn.clicked.connect(self._remove_cest_pool)
         
-        combo_buttons_container.addWidget(add_pool_btn)
-        combo_buttons_container.addWidget(remove_pool_btn)
-        combo_buttons_container.addStretch()
+        button_layout.addWidget(add_pool_btn)
+        button_layout.addWidget(remove_pool_btn)
+        combo_buttons_container.addWidget(button_container)
         
         # Add ComboBox and buttons to main layout
-        pool_selection_layout.addLayout(combo_buttons_container)
+        pool_selection_layout.addWidget(combo_buttons_widget)
         pool_selection_layout.addStretch()
         
         main_layout.addLayout(pool_selection_layout)
@@ -459,7 +480,7 @@ class ConfigDialog(QDialog):
         f_layout = QHBoxLayout()
         f_layout.setSpacing(40)
         f_label = QLabel("Relative Pool Size (f):")
-        f_label.setFixedWidth(200)
+        f_label.setFixedWidth(180)
         self.cest_f = QDoubleSpinBox()
         self.cest_f.setRange(0.00001, 0.1)
         self.cest_f.setDecimals(6)
@@ -473,7 +494,7 @@ class ConfigDialog(QDialog):
         t1_layout = QHBoxLayout()
         t1_layout.setSpacing(40)
         t1_label = QLabel("T1 [s]:")
-        t1_label.setFixedWidth(200)
+        t1_label.setFixedWidth(180)
         self.cest_t1 = QDoubleSpinBox()
         self.cest_t1.setRange(0.1, 10.0)
         self.cest_t1.setSingleStep(0.1)
@@ -486,7 +507,7 @@ class ConfigDialog(QDialog):
         t2_layout = QHBoxLayout()
         t2_layout.setSpacing(40)
         t2_label = QLabel("T2 [s]:")
-        t2_label.setFixedWidth(200)
+        t2_label.setFixedWidth(180)
         self.cest_t2 = QDoubleSpinBox()
         self.cest_t2.setRange(0.001, 5.0)
         self.cest_t2.setSingleStep(0.01)
@@ -500,7 +521,7 @@ class ConfigDialog(QDialog):
         k_layout = QHBoxLayout()
         k_layout.setSpacing(40)
         k_label = QLabel("Exchange Rate k [Hz]:")
-        k_label.setFixedWidth(200)
+        k_label.setFixedWidth(180)
         self.cest_k = QDoubleSpinBox()
         self.cest_k.setRange(0, 1000)
         self.cest_k.setSingleStep(10)
@@ -513,7 +534,7 @@ class ConfigDialog(QDialog):
         dw_layout = QHBoxLayout()
         dw_layout.setSpacing(40)
         dw_label = QLabel("Chemical Shift dw [ppm]:")
-        dw_label.setFixedWidth(200)
+        dw_label.setFixedWidth(180)
         self.cest_dw = QDoubleSpinBox()
         self.cest_dw.setRange(-10, 10)
         self.cest_dw.setSingleStep(0.5)
@@ -542,7 +563,7 @@ class ConfigDialog(QDialog):
         b0_layout = QHBoxLayout()
         b0_layout.setSpacing(40)
         b0_label = QLabel("B0 Field Strength [T]:")
-        b0_label.setFixedWidth(200)
+        b0_label.setFixedWidth(180)
         self.scanner_b0 = QDoubleSpinBox()
         self.scanner_b0.setRange(1.0, 20.0)
         self.scanner_b0.setValue(self.config_params["b0"])
@@ -556,7 +577,7 @@ class ConfigDialog(QDialog):
         gamma_layout = QHBoxLayout()
         gamma_layout.setSpacing(40)
         gamma_label = QLabel("Gyromagnetic Ratio [rad/uT]:")
-        gamma_label.setFixedWidth(200)
+        gamma_label.setFixedWidth(180)
         self.scanner_gamma = QDoubleSpinBox()
         self.scanner_gamma.setRange(100.0, 300.0)
         self.scanner_gamma.setValue(self.config_params["gamma"])
@@ -571,7 +592,7 @@ class ConfigDialog(QDialog):
         b0_inhom_layout = QHBoxLayout()
         b0_inhom_layout.setSpacing(40)
         b0_inhom_label = QLabel("B0 Inhomogeneity [ppm]:")
-        b0_inhom_label.setFixedWidth(200)
+        b0_inhom_label.setFixedWidth(180)
         self.scanner_b0_inhom = QDoubleSpinBox()
         self.scanner_b0_inhom.setRange(0.0, 1.0)
         self.scanner_b0_inhom.setValue(self.config_params["b0_inhom"])
@@ -586,7 +607,7 @@ class ConfigDialog(QDialog):
         rel_b1_layout = QHBoxLayout()
         rel_b1_layout.setSpacing(40)
         rel_b1_label = QLabel("Relative B1 Inhomogeneity:")
-        rel_b1_label.setFixedWidth(200)
+        rel_b1_label.setFixedWidth(180)
         self.scanner_rel_b1 = QDoubleSpinBox()
         self.scanner_rel_b1.setRange(0.1, 2.0)
         self.scanner_rel_b1.setValue(self.config_params["rel_b1"])
@@ -610,7 +631,7 @@ class ConfigDialog(QDialog):
         verbose_layout = QHBoxLayout()
         verbose_layout.setSpacing(40)
         verbose_label = QLabel("Verbose Output:")
-        verbose_label.setFixedWidth(200)
+        verbose_label.setFixedWidth(180)
         self.advanced_verbose = QCheckBox()
         self.advanced_verbose.setChecked(self.config_params["verbose"])
         self.advanced_verbose.stateChanged.connect(lambda state: self._update_param("verbose", None, state == Qt.CheckState.Checked))
@@ -622,7 +643,7 @@ class ConfigDialog(QDialog):
         reset_layout = QHBoxLayout()
         reset_layout.setSpacing(40)
         reset_label = QLabel("Reset Magnetization:")
-        reset_label.setFixedWidth(200)
+        reset_label.setFixedWidth(180)
         self.advanced_reset = QCheckBox()
         self.advanced_reset.setChecked(self.config_params["reset_init_mag"])
         self.advanced_reset.stateChanged.connect(lambda state: self._update_param("reset_init_mag", None, state == Qt.CheckState.Checked))
@@ -634,7 +655,7 @@ class ConfigDialog(QDialog):
         scale_layout = QHBoxLayout()
         scale_layout.setSpacing(40)
         scale_label = QLabel("Relative Magnetization:")
-        scale_label.setFixedWidth(200)
+        scale_label.setFixedWidth(180)
         self.advanced_scale = QDoubleSpinBox()
         self.advanced_scale.setRange(0.1, 10.0)
         self.advanced_scale.setValue(self.config_params["scale"])
@@ -648,7 +669,7 @@ class ConfigDialog(QDialog):
         samples_layout = QHBoxLayout()
         samples_layout.setSpacing(40)
         samples_label = QLabel("Max. Pulse Samples:")
-        samples_label.setFixedWidth(200)
+        samples_label.setFixedWidth(180)
         self.advanced_samples = QSpinBox()
         self.advanced_samples.setRange(100, 5000)
         self.advanced_samples.setValue(self.config_params["max_pulse_samples"])
