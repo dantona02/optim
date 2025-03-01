@@ -1,14 +1,94 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFileDialog, QSlider, QComboBox, QToolButton,
-    QFrame
+    QFrame, QListView
 )
-from PyQt6.QtCore import Qt, QUrl, QTimer, QSize
+from PyQt6.QtCore import Qt, QUrl, QTimer, QSize, QEvent
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
-from PyQt6.QtGui import QPixmap, QImage, QIcon, QColor
+from PyQt6.QtGui import QPixmap, QImage, QIcon, QColor, QStandardItemModel, QStandardItem
 import os
 from pathlib import Path
+
+class CustomSpeedComboBox(QComboBox):
+    """Eine Custom ComboBox, die im geschlossenen Zustand keinen Text anzeigt."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # Erstelle ein custom Model für die Items
+        self._model = QStandardItemModel()
+        self.setModel(self._model)
+        
+        # Speichere die original Texte
+        self._texts = []
+        
+        # Setze eine custom View
+        self._list_view = QListView()
+        self.setView(self._list_view)
+        
+        # Style
+        self.setStyleSheet("""
+            QComboBox {
+                background-color: transparent;
+                border: none;
+                border-radius: 0px;
+                padding: 3px;
+                min-width: 28px;
+                max-width: 55px;
+                margin-left: 6px;
+            }
+            QComboBox:hover {
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 10px;
+            }
+            QComboBox:pressed {
+                background: rgba(255, 255, 255, 0.25);
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 28px;
+                subcontrol-origin: padding;
+                subcontrol-position: center;
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(30, 30, 30, 0.95);
+                color: white;
+                selection-background-color: rgba(66, 135, 245, 0.5);
+                selection-color: white;
+                border: none;
+                outline: none;
+                padding: 3px;
+                min-width: 70px;
+            }
+            QComboBox QAbstractItemView::item {
+                color: white;
+                min-height: 22px;
+                padding: 2px 6px;
+            }
+        """)
+    
+    def addItems(self, texts):
+        """Überschreibe addItems um die Texte zu speichern."""
+        self._texts = texts
+        # Füge leere Items hinzu für den geschlossenen Zustand
+        for _ in texts:
+            item = QStandardItem("")
+            self._model.appendRow(item)
+    
+    def showPopup(self):
+        """Zeige die Texte wenn das Popup geöffnet wird."""
+        # Setze die Texte für alle Items
+        for i, text in enumerate(self._texts):
+            self._model.item(i).setText(text)
+        super().showPopup()
+    
+    def hidePopup(self):
+        """Verstecke die Texte wenn das Popup geschlossen wird."""
+        super().hidePopup()
+        # Leere die Texte für alle Items
+        for i in range(self._model.rowCount()):
+            self._model.item(i).setText("")
 
 class VideoPanel(QWidget):
     """A class representing the video panel in the BMC Simulator GUI."""
@@ -218,58 +298,22 @@ class VideoPanel(QWidget):
         )
         media_controls_layout.addWidget(self.forward_btn)
         
-        # Speed control button with SVG icon - positioned directly after Forward button
-        self.speed_combo = QComboBox()
+        # Speed control mit der neuen CustomSpeedComboBox
+        self.speed_combo = CustomSpeedComboBox()
         self.speed_combo.addItems(["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"])
         self.speed_combo.setCurrentIndex(2)  # 1.0x default
         self.speed_combo.setEnabled(False)
         self.speed_combo.setToolTip("Playback Speed")
         
-        # Minimalistisches Apple-style Design für das Dropdown-Menü
-        self.speed_combo.setStyleSheet(f"""
-            QComboBox {{
-                background-color: transparent;
-                color: transparent;
-                border: none;
-                border-radius: 0px;
-                padding: 3px;
-                min-width: 28px;
-                max-width: 28px;
-                margin-left: 6px;
-            }}
-            QComboBox:hover {{
-                background: rgba(255, 255, 255, 0.15);
-                border-radius: 10px;
-            }}
-            QComboBox:pressed {{
-                background: rgba(255, 255, 255, 0.25);
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                width: 28px;
-                subcontrol-origin: padding;
-                subcontrol-position: center;
-            }}
+        # Set down arrow icon
+        self.speed_combo.setStyleSheet(self.speed_combo.styleSheet() + f"""
             QComboBox::down-arrow {{
                 image: url("{os.path.join(os.path.dirname(__file__), "down.svg")}");
                 width: 16px;
                 height: 16px;
             }}
-            QComboBox QAbstractItemView {{
-                background-color: rgba(30, 30, 30, 0.95);
-                color: white;
-                selection-background-color: rgba(66, 135, 245, 0.5);
-                selection-color: white;
-                border: none;
-                outline: none;
-                padding: 3px;
-            }}
-            QComboBox QAbstractItemView::item {{
-                color: white;
-                min-height: 22px;
-                padding: 2px 6px;
-            }}
         """)
+        
         self.speed_combo.currentIndexChanged.connect(self.speed_changed)
         media_controls_layout.addWidget(self.speed_combo)
         
