@@ -210,7 +210,18 @@ class VideoPanel(QWidget):
         # Time display - Hintergrund transparent
         self.time_label = QLabel("00:00 / 00:00")
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.time_label.setStyleSheet("color: white; font-size: 13px; font-weight: 500; background: transparent;")
+        self.time_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 13px;
+                font-weight: 500;
+                background: transparent;
+            }
+            QLabel[enabled="false"] {
+                color: rgba(255, 255, 255, 0.4);
+            }
+        """)
+        self.time_label.setProperty("enabled", False)
         time_controls_layout.addWidget(self.time_label)
         
         time_controls_layout.addStretch(1)
@@ -305,12 +316,15 @@ class VideoPanel(QWidget):
         self.speed_combo.setEnabled(False)
         self.speed_combo.setToolTip("Playback Speed")
         
-        # Set down arrow icon
+        # Set down arrow icon with disabled state
         self.speed_combo.setStyleSheet(self.speed_combo.styleSheet() + f"""
             QComboBox::down-arrow {{
                 image: url("{os.path.join(os.path.dirname(__file__), "down.svg")}");
                 width: 16px;
                 height: 16px;
+            }}
+            QComboBox::down-arrow:disabled {{
+                opacity: 0.4;
             }}
         """)
         
@@ -377,13 +391,16 @@ class VideoPanel(QWidget):
             # Load the video
             self.media_player.setSource(QUrl.fromLocalFile(video_path))
             
-            # Enable buttons
+            # Enable buttons and controls
             self.play_btn.setEnabled(True)
             self.rewind_btn.setEnabled(True)
             self.forward_btn.setEnabled(True)
             self.speed_combo.setEnabled(True)
             self.position_slider.setEnabled(True)
             self.download_btn.setEnabled(True)
+            self.time_label.setProperty("enabled", True)
+            self.time_label.style().unpolish(self.time_label)
+            self.time_label.style().polish(self.time_label)
             self.is_paused = False
             
             # Play the video automatically
@@ -397,12 +414,16 @@ class VideoPanel(QWidget):
         self.current_video_path = None
         self.video_widget.setVisible(False)
         self.placeholder.setVisible(True)
+        # Disable all controls
         self.play_btn.setEnabled(False)
         self.rewind_btn.setEnabled(False)
         self.forward_btn.setEnabled(False)
         self.speed_combo.setEnabled(False)
         self.position_slider.setEnabled(False)
         self.download_btn.setEnabled(False)
+        self.time_label.setProperty("enabled", False)
+        self.time_label.style().unpolish(self.time_label)
+        self.time_label.style().polish(self.time_label)
         self.position_slider.setValue(0)
         self.time_label.setText("00:00 / 00:00")
     
