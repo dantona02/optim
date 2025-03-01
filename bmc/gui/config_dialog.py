@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from pathlib import Path
+from .animated_toggle import AnimatedToggle
 import yaml
 import os
 
@@ -358,7 +359,7 @@ class ConfigDialog(QDialog):
         button_layout.addStretch(1)  # Flexibler Platz nach den Buttons
         
         layout.addLayout(button_layout)
-        
+        self.setFixedSize(self.sizeHint())
 
     def _create_water_pool_tab(self):
         """Creates the tab for water pool parameters"""
@@ -630,25 +631,37 @@ class ConfigDialog(QDialog):
         # verbose - detailed output
         verbose_layout = QHBoxLayout()
         verbose_layout.setSpacing(40)
+        verbose_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # Links ausrichten
         verbose_label = QLabel("Verbose Output:")
-        verbose_label.setFixedWidth(180)
-        self.advanced_verbose = QCheckBox()
+        verbose_label.setFixedWidth(170)
+        self.advanced_verbose = AnimatedToggle(
+            checked_color="#2962FF", 
+            pulse_checked_color="#4400B0EE"
+        )
+        self.advanced_verbose.setFixedSize(self.advanced_verbose.sizeHint())
         self.advanced_verbose.setChecked(self.config_params["verbose"])
         self.advanced_verbose.stateChanged.connect(lambda state: self._update_param("verbose", None, state == Qt.CheckState.Checked))
         verbose_layout.addWidget(verbose_label)
         verbose_layout.addWidget(self.advanced_verbose)
+        verbose_layout.addStretch()  # Stretch am Ende, um Links-Ausrichtung zu erzwingen
         layout.addLayout(verbose_layout)
         
         # reset_init_mag - reset magnetization
         reset_layout = QHBoxLayout()
         reset_layout.setSpacing(40)
+        reset_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # Links ausrichten
         reset_label = QLabel("Reset Magnetization:")
-        reset_label.setFixedWidth(180)
-        self.advanced_reset = QCheckBox()
+        reset_label.setFixedWidth(170)
+        self.advanced_reset = AnimatedToggle(
+            checked_color="#2962FF", 
+            pulse_checked_color="#4400B0EE"
+        )
+        self.advanced_reset.setFixedSize(self.advanced_reset.sizeHint())
         self.advanced_reset.setChecked(self.config_params["reset_init_mag"])
         self.advanced_reset.stateChanged.connect(lambda state: self._update_param("reset_init_mag", None, state == Qt.CheckState.Checked))
         reset_layout.addWidget(reset_label)
         reset_layout.addWidget(self.advanced_reset)
+        reset_layout.addStretch()  # Stretch am Ende, um Links-Ausrichtung zu erzwingen
         layout.addLayout(reset_layout)
         
         # scale - relative magnetization
