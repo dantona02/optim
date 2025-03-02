@@ -9,89 +9,182 @@ from pathlib import Path
 
 class DatasetControlPanel(QFrame):
     """A panel for controlling dataset visibility"""
-    # Signal when a dataset is deleted
-    dataset_deleted = pyqtSignal(str)  # Emits the name of the deleted dataset
+    dataset_deleted = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.datasets = {}  # {name: (checkbox, delete_button, data)}
+        self.datasets = {}
         self.is_expanded = False
-        self.normal_width = 200
-        self.collapsed_width = 24
+        self.normal_width = 220
+        self.collapsed_width = 20  # Reduzierte Breite
         self.setup_ui()
         
         # Style
         self.setStyleSheet("""
+            /* Main Frame */
             QFrame {
                 background-color: transparent;
                 border: none;
             }
+            
+            /* Content Frame */
             QFrame#contentFrame {
-                background-color: #2D2D2D;
-                border: 1px solid #404040;
-                border-radius: 4px;
-            }
-            QFrame#collapsedFrame {
                 background-color: transparent;
-                border: none;
-                border-radius: 0;
-            }
-            QCheckBox {
-                color: #E0E0E0;
-                padding: 4px 8px;
-                margin: 2px;
-            }
-            QCheckBox:hover {
-                background-color: rgba(56, 56, 56, 0.6);
-                border-radius: 3px;
-            }
-            QCheckBox:checked {
-                color: #2962FF;
-            }
-            QPushButton {
-                background-color: #2D2D2D;
                 border: 1px solid #404040;
-                border-radius: 3px;
-                color: #E0E0E0;
-                padding: 4px 12px;
-                margin: 4px;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
             }
-            QPushButton:hover {
-                background-color: rgba(56, 56, 56, 0.6);
-                border: 1px solid #2962FF;
-                color: #2962FF;
+            
+            /* Toggle Button Frame */
+            QFrame#toggleFrame {
+                background-color: #2D2D2D;
+                border-top: 1px solid #404040;
+                border-bottom: 1px solid #404040;
+                border-left: 1px solid #404040;
+                border-right: none;
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+                padding: 0;
+                margin: 0;
             }
-            QToolButton {
-                background-color: transparent;
-                border: none;
-                padding: 2px;
-                margin: 2px;
-            }
+            
+            /* Toggle Button */
             QToolButton#toggleButton {
                 background-color: transparent;
                 border: none;
-                border-radius: 3px;
-                padding: 4px;
+                border-radius: 0;
+                padding: 0;
+                margin: 0;
+                margin-left: 2px; /* Zentriert das Icon besser */
+                height: 28px;
             }
             QToolButton#toggleButton:hover {
-                background-color: rgba(56, 56, 56, 0.6);
+                background-color: rgba(41, 98, 255, 0.1);
             }
-            QToolButton#deleteButton:hover {
-                background-color: rgba(224, 32, 32, 0.2);
-                border-radius: 3px;
+            QToolButton#toggleButton:pressed {
+                background-color: rgba(41, 98, 255, 0.2);
             }
-            QLabel {
-                color: #E0E0E0;
-                font-weight: bold;
-                padding: 4px;
-                border: none;
-                background: transparent;
-            }
+            
+            /* Header */
             QLabel#headerLabel {
+                color: #888888;
+                font-size: 11px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                padding: 12px 8px 8px 8px;
                 border: none;
                 background: transparent;
-                margin-top: 4px;
-                margin-bottom: 4px;
+            }
+            
+            /* Clear All Button */
+            QPushButton#clearButton {
+                background-color: transparent;
+                border: 1px solid #404040;
+                border-radius: 3px;
+                color: #888888;
+                padding: 6px 12px;
+                margin: 4px 8px 12px 8px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            QPushButton#clearButton:hover {
+                background-color: rgba(41, 98, 255, 0.1);
+                border: 1px solid #2962FF;
+                color: #2962FF;
+            }
+            QPushButton#clearButton:pressed {
+                background-color: rgba(41, 98, 255, 0.2);
+            }
+            
+            /* Dataset Row Container */
+            QWidget#datasetRow {
+                background-color: transparent;
+                border-radius: 3px;
+                margin: 0px;
+                padding: 0px;
+            }
+            
+            QWidget#datasetRow:hover {
+                background-color: rgba(56, 56, 56, 0.5);
+            }
+            
+            /* Dataset Checkboxes */
+            QCheckBox {
+                color: #E0E0E0;
+                padding: 6px 8px;
+                margin: 1px 0px;
+                border-radius: 3px;
+                font-size: 12px;
+                background-color: transparent;
+            }
+            
+            QCheckBox:checked {
+                color: #2962FF;
+            }
+            
+            /* Delete Button */
+            QToolButton#deleteButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 3px;
+                padding: 3px;
+                margin-right: 2px;
+                min-width: 28px;
+                max-width: 28px;
+                min-height: 28px;
+                max-height: 28px;
+                opacity: 0.7;
+            }
+            
+            QToolButton#deleteButton:hover {
+                background-color: rgba(224, 32, 32, 0.1);
+                opacity: 1;
+            }
+            
+            QToolButton#deleteButton:pressed {
+                background-color: rgba(224, 32, 32, 0.2);
+            }
+            
+            /* Scroll Area */
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollArea > QWidget > QWidget {
+                background-color: transparent;
+            }
+            
+            /* Scrollbar */
+            QScrollBar:vertical {
+                border: none;
+                background: transparent;
+                width: 4px;  /* Schmaler */
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(64, 64, 64, 0.5);  /* Semi-transparent */
+                min-height: 20px;
+                border-radius: 2px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(77, 77, 77, 0.7);  /* Etwas dunkler beim Hover */
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0;  /* Verstecke die Buttons komplett */
+            }
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {
+                background: none;
+            }
+            
+            /* Dataset Container */
+            QWidget#datasetContainer {
+                background-color: transparent;
+                border: none;
             }
         """)
     
@@ -100,74 +193,56 @@ class DatasetControlPanel(QFrame):
         # Main layout
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
+        self.main_layout.setSpacing(0)  # Kein Abstand zwischen Toggle und Content
         
-        # Toggle button container (always visible)
+        # Toggle button container
         self.toggle_container = QFrame(self)
-        self.toggle_container.setObjectName("collapsedFrame")
+        self.toggle_container.setObjectName("toggleFrame")
         self.toggle_container.setFixedWidth(self.collapsed_width)
         toggle_layout = QVBoxLayout(self.toggle_container)
-        toggle_layout.setContentsMargins(0, 0, 0, 0)
+        toggle_layout.setContentsMargins(0, 0, 0, 0)  # Keine Innenabstände
         toggle_layout.setSpacing(0)
         
         # Toggle button
         self.toggle_button = QToolButton()
         self.toggle_button.setObjectName("toggleButton")
         self.toggle_button.setIcon(QIcon(str(Path(__file__).resolve().parent / 'images' / 'chevron-left.svg')))
-        self.toggle_button.setFixedSize(24, 24)
+        self.toggle_button.setIconSize(QSize(16, 16))
+        self.toggle_button.setFixedSize(20, 28)
         self.toggle_button.clicked.connect(self.toggle_panel)
-        toggle_layout.addWidget(self.toggle_button)
+        toggle_layout.addWidget(self.toggle_button, 0, Qt.AlignmentFlag.AlignTop)  # Align top
         toggle_layout.addStretch()
         
-        # Content container (expandable)
+        # Content container with refined styling
         self.content_container = QFrame(self)
         self.content_container.setObjectName("contentFrame")
         content_layout = QVBoxLayout(self.content_container)
-        content_layout.setContentsMargins(8, 8, 8, 8)
-        content_layout.setSpacing(4)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
         
-        # Header
-        header = QLabel("Datasets")
+        # Header with new styling
+        header = QLabel("DATASETS")
         header.setObjectName("headerLabel")
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.setAlignment(Qt.AlignmentFlag.AlignLeft)
         content_layout.addWidget(header)
         
-        # Clear button
+        # Clear button with new styling
         self.clear_button = QPushButton("Clear All")
+        self.clear_button.setObjectName("clearButton")
         self.clear_button.clicked.connect(self.clear_all_datasets)
         content_layout.addWidget(self.clear_button)
         
-        # Scroll area for datasets
+        # Scroll area with refined appearance
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background: #2D2D2D;
-                width: 8px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #404040;
-                min-height: 20px;
-                border-radius: 4px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-        """)
         
-        # Container for checkboxes
+        # Dataset container mit angepasstem Styling
         self.checkbox_container = QWidget()
+        self.checkbox_container.setObjectName("datasetContainer")
         self.checkbox_layout = QVBoxLayout(self.checkbox_container)
-        self.checkbox_layout.setContentsMargins(4, 4, 4, 4)
-        self.checkbox_layout.setSpacing(2)
+        self.checkbox_layout.setContentsMargins(6, 0, 6, 8)
+        self.checkbox_layout.setSpacing(4)  # Optimaler Abstand zwischen den Reihen
         self.checkbox_layout.addStretch()
         
         scroll.setWidget(self.checkbox_container)
@@ -181,13 +256,13 @@ class DatasetControlPanel(QFrame):
         self.content_container.setFixedWidth(0)
         self.setFixedWidth(self.collapsed_width)
         
-        # Create animation
+        # Animations
         self.animation = QPropertyAnimation(self, b"minimumWidth")
-        self.animation.setDuration(200)
+        self.animation.setDuration(150)  # Schnellere Animation
         self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         self.content_animation = QPropertyAnimation(self.content_container, b"minimumWidth")
-        self.content_animation.setDuration(200)
+        self.content_animation.setDuration(150)  # Schnellere Animation
         self.content_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
     
     def toggle_panel(self):
@@ -224,26 +299,30 @@ class DatasetControlPanel(QFrame):
     
     def create_dataset_row(self, name):
         """Create a row with checkbox and delete button"""
+        # Create main row widget
         row_widget = QWidget()
-        row_layout = QHBoxLayout(row_widget)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(4)
+        row_widget.setObjectName("datasetRow")
         
-        # Checkbox
+        # Create row layout with better spacing and alignment
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(2, 2, 2, 2)
+        row_layout.setSpacing(6)  # Optimaler Abstand zwischen Checkbox und Button
+        
+        # Checkbox mit klarem Text
         checkbox = QCheckBox(name)
         checkbox.setChecked(True)
         checkbox.stateChanged.connect(self.update_plots)
         
-        # Delete button
+        # Delete button with improved visibility
         delete_button = QToolButton()
         delete_button.setObjectName("deleteButton")
         delete_button.setIcon(QIcon(str(Path(__file__).resolve().parent / 'images' / 'trash.svg')))
-        delete_button.setFixedSize(20, 20)
+        delete_button.setIconSize(QSize(18, 18))  # Optimierte Icongröße
         delete_button.clicked.connect(lambda: self.delete_dataset(name))
         
-        # Add widgets to row
-        row_layout.addWidget(checkbox, stretch=1)
-        row_layout.addWidget(delete_button)
+        # Add widgets to row with proper alignment
+        row_layout.addWidget(checkbox, 1)  # Checkbox takes available space
+        row_layout.addWidget(delete_button, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         return row_widget, checkbox, delete_button
     
