@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QWidget, QToolButton
 from PyQt6.QtCore import Qt
 import matplotlib
 matplotlib.use('QtAgg')
@@ -6,6 +6,84 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import numpy as np
+
+class CustomPopupNavigationToolbar(NavigationToolbar):
+    """Custom Navigation Toolbar with modified appearance for the popup dialog"""
+    
+    def __init__(self, canvas, parent):
+        super().__init__(canvas, parent)
+        
+        # Speichere den letzten ausgewählten Button
+        self.active_tool = None
+        
+        # Verbinde alle Action-Aktivierungen mit Highlighting
+        for action in self.actions():
+            action.triggered.connect(lambda checked, act=action: self._highlight_action(act))
+        
+        # Style der Toolbar
+        self.setStyleSheet("""
+            QToolBar {
+                background-color: transparent;
+                border: none;
+                spacing: 2px;
+            }
+            QToolButton {
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 3px;
+                padding: 2px;
+                color: #888888;
+            }
+            QToolButton:hover {
+                background-color: rgba(56, 56, 56, 0.6);
+                border: 1px solid #404040;
+                color: #E0E0E0;
+            }
+            QToolButton:pressed {
+                background-color: rgba(45, 45, 45, 0.8);
+                border: 1px solid #2962FF;
+                color: #2962FF;
+            }
+        """)
+    
+    def _highlight_action(self, action):
+        """Hebt den ausgewählten Button hervor und entfernt Hervorhebung von anderen"""
+        # Bei einigen Aktionen (wie Speichern) soll kein dauerhaftes Highlighting erfolgen
+        non_toggle_actions = ["Save", "Home"]
+        
+        if action.text() in non_toggle_actions:
+            # Für nicht-umschaltbare Aktionen keinen aktiven Status setzen
+            return
+            
+        # Setze den neuen aktiven Button
+        if self.active_tool == action:
+            # Wenn der gleiche Button erneut geklickt wird, deaktivieren
+            self.active_tool = None
+        else:
+            self.active_tool = action
+        
+        # Aktualisiere Styles für alle Actions
+        self._update_action_styles()
+    
+    def _update_action_styles(self):
+        """Aktualisiert die Styles aller Action-Buttons basierend auf dem aktiven Status"""
+        for action in self.actions():
+            # Finde den Button für diese Action
+            for widget in self.children():
+                if isinstance(widget, QToolButton) and widget.defaultAction() == action:
+                    if action == self.active_tool:
+                        # Hervorhebung des aktiven Buttons mit blauer Umrandung
+                        widget.setStyleSheet("""
+                            QToolButton {
+                                background-color: rgba(41, 98, 255, 0.2);
+                                border: 1px solid #2962FF;
+                                border-radius: 3px;
+                                color: #2962FF;
+                            }
+                        """)
+                    else:
+                        # Zurücksetzen auf normalen Stil
+                        widget.setStyleSheet("")
 
 class PlotPopupDialog(QDialog):
     """Dialog zum Anzeigen eines Plots in einem separaten Fenster."""
@@ -33,32 +111,8 @@ class PlotPopupDialog(QDialog):
         self.figure = Figure(figsize=(12, 8))
         self.canvas = FigureCanvas(self.figure)
         
-        # Toolbar hinzufügen
-        self.toolbar = NavigationToolbar(self.canvas, self)
-        self.toolbar.setStyleSheet("""
-            QToolBar {
-                background-color: transparent;
-                border: none;
-                spacing: 2px;
-            }
-            QToolButton {
-                background-color: transparent;
-                border: 1px solid transparent;
-                border-radius: 3px;
-                padding: 2px;
-                color: #888888;
-            }
-            QToolButton:hover {
-                background-color: rgba(56, 56, 56, 0.6);
-                border: 1px solid #404040;
-                color: #E0E0E0;
-            }
-            QToolButton:pressed {
-                background-color: rgba(45, 45, 45, 0.8);
-                border: 1px solid #2962FF;
-                color: #2962FF;
-            }
-        """)
+        # Toolbar hinzufügen - jetzt mit der Custom-Klasse
+        self.toolbar = CustomPopupNavigationToolbar(self.canvas, self)
         
         # Canvas und Toolbar zum Layout hinzufügen
         layout.addWidget(self.canvas)

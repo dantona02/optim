@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox, QFrame, QPushButton
+    QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox, QFrame, QPushButton,
+    QToolButton
 )
 from PyQt6.QtCore import QLocale, Qt, QSize
 from PyQt6.QtGui import QIcon
@@ -26,6 +27,13 @@ class CustomNavigationToolbar(NavigationToolbar):
         
         # Füge den Popup-Button hinzu
         self.popup_button = self._create_popup_button()
+        
+        # Speichere den letzten ausgewählten Button
+        self.active_tool = None
+        
+        # Verbinde alle Action-Aktivierungen mit Highlighting
+        for action in self.actions():
+            action.triggered.connect(lambda checked, act=action: self._highlight_action(act))
         
         # Style der Toolbar
         self.setStyleSheet("""
@@ -63,6 +71,48 @@ class CustomNavigationToolbar(NavigationToolbar):
                 border: 1px solid #404040;
             }
         """)
+        
+        # Setze das Aussehen der ausgewählten Buttons
+        self._update_action_styles()
+    
+    def _highlight_action(self, action):
+        """Hebt den ausgewählten Button hervor und entfernt Hervorhebung von anderen"""
+        # Bei einigen Aktionen (wie Speichern) soll kein dauerhaftes Highlighting erfolgen
+        non_toggle_actions = ["Save", "Home", "Open in Popup"]
+        
+        if action.text() in non_toggle_actions:
+            # Für nicht-umschaltbare Aktionen keinen aktiven Status setzen
+            return
+            
+        # Setze den neuen aktiven Button
+        if self.active_tool == action:
+            # Wenn der gleiche Button erneut geklickt wird, deaktivieren
+            self.active_tool = None
+        else:
+            self.active_tool = action
+        
+        # Aktualisiere Styles für alle Actions
+        self._update_action_styles()
+    
+    def _update_action_styles(self):
+        """Aktualisiert die Styles aller Action-Buttons basierend auf dem aktiven Status"""
+        for action in self.actions():
+            # Finde den Button für diese Action
+            for widget in self.children():
+                if isinstance(widget, QToolButton) and widget.defaultAction() == action:
+                    if action == self.active_tool:
+                        # Hervorhebung des aktiven Buttons mit blauer Umrandung
+                        widget.setStyleSheet("""
+                            QToolButton {
+                                background-color: rgba(41, 98, 255, 0.2);
+                                border: 1px solid #2962FF;
+                                border-radius: 3px;
+                                color: #2962FF;
+                            }
+                        """)
+                    else:
+                        # Zurücksetzen auf normalen Stil
+                        widget.setStyleSheet("")
     
     def _create_popup_button(self):
         """Erstellt einen Popup-Button für die Toolbar"""
