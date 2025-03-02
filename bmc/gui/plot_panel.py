@@ -2,12 +2,15 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox, QFrame, QPushButton
 )
 from PyQt6.QtCore import QLocale, Qt, QSize
+from PyQt6.QtGui import QIcon
+from pathlib import Path
 import matplotlib
 matplotlib.use('QtAgg')  # Use QtAgg for PyQt6
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import numpy as np
+from .plot_popup_dialog import PlotPopupDialog
 
 class CustomNavigationToolbar(NavigationToolbar):
     """Custom Navigation Toolbar with modified appearance"""
@@ -20,6 +23,9 @@ class CustomNavigationToolbar(NavigationToolbar):
                 child.setMaximumWidth(24)
                 if isinstance(child, QPushButton):
                     child.setIconSize(QSize(16, 16))  # Kleinere Icons
+        
+        # Füge den Popup-Button hinzu
+        self.popup_button = self._create_popup_button()
         
         # Style der Toolbar
         self.setStyleSheet("""
@@ -57,6 +63,63 @@ class CustomNavigationToolbar(NavigationToolbar):
                 border: 1px solid #404040;
             }
         """)
+    
+    def _create_popup_button(self):
+        """Erstellt einen Popup-Button für die Toolbar"""
+        from PyQt6.QtWidgets import QToolButton
+        from PyQt6.QtGui import QAction
+        
+        # Pfad zum Icon ermitteln
+        icon_path = Path(__file__).resolve().parent / 'images' / 'popup.svg'
+        
+        # Erstelle die Aktion für den Button
+        popup_action = QAction(QIcon(str(icon_path)), "Open in Popup", self)
+        popup_action.setToolTip("Open plot in separate window")
+        popup_action.triggered.connect(self._open_in_popup)
+        
+        # Füge die Aktion nach dem Save-Button ein
+        # Finde zunächst den Save-Button Index
+        save_button_index = None
+        for i, action in enumerate(self.actions()):
+            if action.text() == "Save":
+                save_button_index = i
+                break
+        
+        # Füge den neuen Button direkt nach dem Save-Button hinzu
+        if save_button_index is not None:
+            self.insertAction(self.actions()[save_button_index + 1], popup_action)
+        else:
+            self.addAction(popup_action)
+        
+        return popup_action
+    
+    def _open_in_popup(self):
+        """Öffnet den aktuellen Plot in einem separaten Popup-Fenster"""
+        figure = self.canvas.figure
+        title = ""
+        
+        # Ermittle den Titel des aktuellen Tabs
+        parent_widget = self.parent()
+        while parent_widget:
+            if isinstance(parent_widget, QTabWidget):
+                break
+            elif hasattr(parent_widget, 'parent'):
+                parent_widget = parent_widget.parent()
+            else:
+                parent_widget = None
+        
+        # Falls der Parent ein TabWidget ist, hole den Tab-Namen als Titel
+        if isinstance(parent_widget, QTabWidget):
+            # Ermittle, welcher Tab das aktuelle Widget enthält
+            for i in range(parent_widget.count()):
+                if self.parent() == parent_widget.widget(i) or parent_widget.widget(i).isAncestorOf(self.parent()):
+                    title = parent_widget.tabText(i)
+                    break
+        
+        # Erstelle das Popup-Fenster
+        dialog = PlotPopupDialog(parent=self.parent(), title=title)
+        dialog.set_figure(figure)
+        dialog.show()
 
 class PlotPanel(QWidget):
     """A class representing the plot panel in the BMC Simulator GUI."""
