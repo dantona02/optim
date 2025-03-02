@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QWidget, QToolButton
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QWidget, QToolButton, QLabel, QHBoxLayout
 from PyQt6.QtCore import Qt
 import matplotlib
 matplotlib.use('QtAgg')
@@ -6,9 +6,10 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import numpy as np
+import re
 
 class CustomPopupNavigationToolbar(NavigationToolbar):
-    """Custom Navigation Toolbar with modified appearance for the popup dialog"""
+    """Custom Navigation Toolbar mit modifiziertem Aussehen für das Popup-Dialog"""
     
     def __init__(self, canvas, parent):
         super().__init__(canvas, parent)
@@ -19,6 +20,9 @@ class CustomPopupNavigationToolbar(NavigationToolbar):
         # Verbinde alle Action-Aktivierungen mit Highlighting
         for action in self.actions():
             action.triggered.connect(lambda checked, act=action: self._highlight_action(act))
+        
+        # Anpassen der Koordinatenanzeige
+        self._customize_coordinates_display()
         
         # Style der Toolbar
         self.setStyleSheet("""
@@ -44,7 +48,97 @@ class CustomPopupNavigationToolbar(NavigationToolbar):
                 border: 1px solid #2962FF;
                 color: #2962FF;
             }
+            QLabel#coordinates {
+                color: #E0E0E0;
+                background-color: rgba(42, 42, 42, 0.6);
+                padding: 3px 8px;
+                border-radius: 3px;
+                font-size: 12px;
+                margin-left: 5px;
+                border: 1px solid #404040;
+            }
         """)
+    
+    def _customize_coordinates_display(self):
+        """Passt die Koordinatenanzeige an"""
+        # Suche das Label, das für die Koordinaten verwendet wird
+        for widget in self.children():
+            if isinstance(widget, QLabel) and hasattr(widget, 'text'):
+                # Entferne das bestehende Label aus dem Layout
+                widget.setParent(None)
+                
+                # Erstelle ein neues Label mit verbessertem Styling
+                self.coordinates_label = QLabel("")
+                self.coordinates_label.setObjectName("coordinates")
+                self.coordinates_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.coordinates_label.setSizePolicy(
+                    QToolButton().sizePolicy().horizontalPolicy(),
+                    QToolButton().sizePolicy().verticalPolicy()
+                )
+                
+                # Füge das Label direkt zur Toolbar hinzu, ohne einen Index zu verwenden
+                self.addWidget(self.coordinates_label)
+                
+                # Überschreibe die originale set_message Methode
+                self.original_set_message = self.set_message
+                self.set_message = self._custom_set_message
+                return
+    
+    def _normalize_number_string(self, value_str):
+        """Normalisiert eine Zahl in String-Form für die Konvertierung zu float
+        
+        Behandelt spezielle Zeichen wie Unicode-Minuszeichen und wissenschaftliche Notation
+        """
+        # Ersetze alle möglichen Unicode-Minuszeichen mit normalem Bindestrich
+        # \u2212 ist das Unicode-Minuszeichen (−)
+        value_str = value_str.replace('\u2212', '-').replace('−', '-')
+        
+        # Normalisiere wissenschaftliche Notation (e−05 -> e-05)
+        # Suche nach 'e' gefolgt von einem beliebigen Minuszeichen und Zahlen
+        value_str = re.sub(r'e[\u2212−-](\d+)', r'e-\1', value_str)
+        
+        # Entferne eventuelle Leerzeichen
+        value_str = value_str.strip()
+        
+        return value_str
+    
+    def _custom_set_message(self, s):
+        """Angepasste version der set_message Methode für die Koordinatenanzeige"""
+        if not hasattr(self, 'coordinates_label'):
+            self.original_set_message(s)
+            return
+            
+        if s:
+            # Für Koordinaten-Anzeige im Format (x,y) = (0.123423, 0.432534)
+            if '(x, y)' in s and '=' in s:
+                try:
+                    # Extrahiere die Werte im Format "(x,y) = (0.123423, 0.432534)"
+                    right_part = s.split('=')[1].strip()  # "(0.123423, 0.432534)"
+                    
+                    # Entferne Klammern und teile die Werte
+                    values_part = right_part.strip('()')  # "0.123423, 0.432534"
+                    values = values_part.split(',')
+                    
+                    if len(values) >= 2:
+                        # Normalisiere die Werte für die Konvertierung
+                        x_str = self._normalize_number_string(values[0].strip())
+                        y_str = self._normalize_number_string(values[1].strip())
+                        
+                        x_value = float(x_str)
+                        y_value = float(y_str)
+                        
+                        # Formatiere als t und M mit mehr signifikanten Stellen (.8f statt .6f)
+                        formatted_msg = f"t = {x_value:.8f}   M = {y_value:.8f}"
+                        self.coordinates_label.setText(formatted_msg)
+                        return
+                except Exception as e:
+                    print(f"Error parsing coordinates: {e}, raw input: '{values_part}'")
+                    pass  # Falls die Extraktion fehlschlägt, verwende den Originaltext
+            
+            # Standard-Anzeige für alle anderen Nachrichten
+            self.coordinates_label.setText(s)
+        else:
+            self.coordinates_label.setText("")
     
     def _highlight_action(self, action):
         """Hebt den ausgewählten Button hervor und entfernt Hervorhebung von anderen"""
