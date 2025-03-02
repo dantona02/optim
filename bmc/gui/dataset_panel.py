@@ -84,7 +84,8 @@ class DatasetControlPanel(QFrame):
                 border-radius: 3px;
                 color: #888888;
                 padding: 6px 12px;
-                margin: 4px 8px 12px 8px;
+                margin: 8px;
+                margin-top: 0px;
                 font-size: 11px;
                 font-weight: 500;
             }
@@ -226,12 +227,6 @@ class DatasetControlPanel(QFrame):
         header.setAlignment(Qt.AlignmentFlag.AlignLeft)
         content_layout.addWidget(header)
         
-        # Clear button with new styling
-        self.clear_button = QPushButton("Clear All")
-        self.clear_button.setObjectName("clearButton")
-        self.clear_button.clicked.connect(self.clear_all_datasets)
-        content_layout.addWidget(self.clear_button)
-        
         # Scroll area with refined appearance
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -247,6 +242,12 @@ class DatasetControlPanel(QFrame):
         
         scroll.setWidget(self.checkbox_container)
         content_layout.addWidget(scroll)
+        
+        # Clear button with new styling
+        self.clear_button = QPushButton("Clear All")
+        self.clear_button.setObjectName("clearButton")
+        self.clear_button.clicked.connect(self.clear_all_datasets)
+        content_layout.addWidget(self.clear_button)
         
         # Add containers to main layout
         self.main_layout.addWidget(self.toggle_container)
