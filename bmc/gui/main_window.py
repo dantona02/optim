@@ -110,7 +110,7 @@ class BMCSimulatorGUI(QMainWindow):
         height = int(screen.height() * 0.7)  # 70% of screen height
         
         # Set minimum size to maintain usability
-        self.setMinimumSize(900, 600)
+        self.setMinimumSize(1200, 800)
         
         # Center the window on screen
         x = (screen.width() - width) // 2

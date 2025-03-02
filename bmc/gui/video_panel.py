@@ -179,31 +179,32 @@ class VideoPanel(QWidget):
         self.position_slider.sliderMoved.connect(self.set_position)
         self.position_slider.setEnabled(False)
         self.position_slider.setStyleSheet("""
+            QSlider {
+                background: transparent;
+                padding: 12px 0px;
+            }
+            
             QSlider::groove:horizontal {
                 height: 4px;
-                background: #444444;
+                background: rgba(68, 68, 68, 0.7);
                 border-radius: 2px;
             }
             
             QSlider::handle:horizontal {
-                background: #4287f5;
+                background: #2962FF;
                 border: none;
-                width: 12px;
-                height: 12px;
-                margin: -4px 0;
-                border-radius: 6px;
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                border-radius: 8px;
             }
             
             QSlider::handle:horizontal:hover {
-                background: #5a9bff;
-                width: 14px;
-                height: 14px;
-                margin: -5px 0;
-                border-radius: 7px;
+                background: #4287f5;
             }
             
             QSlider::sub-page:horizontal {
-                background: #4287f5;
+                background: #2962FF;
                 border-radius: 2px;
             }
         """)
