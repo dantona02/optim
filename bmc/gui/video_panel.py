@@ -143,7 +143,7 @@ class VideoPanel(QWidget):
             QLabel {
                 color: #a0a0a0;
                 font-size: 16px;
-                padding: 40px;
+                padding: 200px 40px;  /* Erhöhtes vertikales Padding von 120px auf 200px */
                 background-color: #222222;
                 border-radius: 10px;
                 font-family: 'Helvetica Neue', Arial, sans-serif;
