@@ -347,13 +347,6 @@ class AnimationControlPanel(QWidget):
                 font-size: 13px;
                 padding: 0px;
             }
-            
-            QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                                          stop:0 #0AC18E, stop:0.3 #22E09A, stop:1 #4ADE80);
-                border-radius: 12px;
-                min-width: 24px;
-            }
         """)
         control_layout.addWidget(self.progress)
         

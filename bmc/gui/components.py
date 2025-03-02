@@ -63,8 +63,9 @@ class AnimatedProgressBar(QProgressBar):
     def gradient(self):
         from PyQt6.QtGui import QLinearGradient, QColor
         gradient = QLinearGradient(0, 0, self.width(), 0)
-        gradient.setColorAt(0, QColor("#1565C0"))
-        gradient.setColorAt(1, QColor("#42a5f5"))
+        gradient.setColorAt(0, QColor("#00804F"))    # Dunkleres Grün am Start
+        gradient.setColorAt(0.3, QColor("#00D68F"))  # Mittleres Grün
+        gradient.setColorAt(1, QColor("#4ADE80"))    # Helleres Grün am Ende
         return gradient
 
     def update_progress(self, n, total=None):
