@@ -230,6 +230,84 @@ class AnimationControlPanel(QWidget):
         self.quality_combo = QComboBox()
         self.quality_combo.addItems(["Low", "Medium", "High"])
         self.quality_combo.setCurrentIndex(0)  # Default: Low
+        self.quality_combo.setFixedWidth(120)  # Fixiere die Breite
+        
+        # Get arrow image paths
+        current_dir = Path(__file__).resolve().parent
+        down_arrow_path = current_dir / 'down.svg'
+        down_arrow_disabled_path = current_dir / 'down_disabled.svg'
+        
+        self.quality_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: #2A2A2A;
+                color: #E0E0E0;
+                border: 1px solid #383838;
+                border-radius: 6px;
+                padding: 5px 8px;
+                padding-right: 25px;
+                min-height: 32px;
+                font-size: 13px;
+            }}
+            
+            QComboBox:hover {{
+                border: 1px solid #424242;
+                background-color: #2D2D2D;
+            }}
+            
+            QComboBox:focus, QComboBox[focused="true"] {{
+                border: 1px solid #2962FF;
+                background-color: #2D2D2D;
+            }}
+            
+            QComboBox:disabled {{
+                background-color: #2A2A2A;
+                color: rgba(224, 224, 224, 0.3);
+                border: 1px solid rgba(56, 56, 56, 0.5);
+            }}
+            
+            QComboBox::drop-down {{
+                border: none;
+                width: 25px;
+            }}
+            
+            QComboBox::down-arrow {{
+                image: url("{down_arrow_path.as_posix()}");
+                width: 16px;
+                height: 16px;
+            }}
+            
+            QComboBox::down-arrow:disabled {{
+                image: url("{down_arrow_disabled_path.as_posix()}");
+            }}
+            
+            QComboBox QAbstractItemView {{
+                background-color: #2A2A2A;
+                color: #E0E0E0;
+                border: 1px solid #383838;
+                selection-background-color: #2962FF;
+                selection-color: white;
+                outline: none;
+                padding: 4px;
+            }}
+            
+            QComboBox QAbstractItemView::item {{
+                min-height: 24px;
+                padding: 4px;
+            }}
+            
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: rgba(41, 98, 255, 0.1);
+            }}
+            
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: #2962FF;
+            }}
+        """)
+        
+        # Connect signals to handle focus highlighting
+        self.quality_combo.view().window().installEventFilter(self)
+        self.quality_combo.setProperty("focused", False)
+        
         quality_box_layout.addWidget(quality_label)
         quality_box_layout.addWidget(self.quality_combo)
         quality_layout.addLayout(quality_box_layout)
@@ -391,3 +469,17 @@ class AnimationControlPanel(QWidget):
         else:
             self.seq_label.setText("No simulation data available")
             self.start_btn.setEnabled(False)
+
+    def eventFilter(self, obj, event):
+        """Verfolge Fokus-Events für ComboBoxes"""
+        if hasattr(obj, "parent") and isinstance(obj.parent(), QComboBox):
+            parent_combo = obj.parent()
+            if event.type() == event.Type.Show:
+                parent_combo.setProperty("focused", True)
+                parent_combo.style().unpolish(parent_combo)
+                parent_combo.style().polish(parent_combo)
+            elif event.type() == event.Type.Hide:
+                parent_combo.setProperty("focused", False)
+                parent_combo.style().unpolish(parent_combo)
+                parent_combo.style().polish(parent_combo)
+        return super().eventFilter(obj, event)
