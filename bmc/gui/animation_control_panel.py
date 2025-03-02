@@ -426,7 +426,7 @@ class AnimationControlPanel(QWidget):
         elif is_success:
             self.status_label.setStyleSheet("""
                 QLabel {
-                    color: #4caf50; 
+                    color: #4ADE80; 
                     font-weight: 600; 
                     padding-top: 0px;
                     padding-bottom: 20px;

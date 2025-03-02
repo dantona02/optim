@@ -216,7 +216,7 @@ class AnimationAdapter:
                         if self.track_path:
                             self.add(*paths)
 
-                        self.set_camera_orientation(phi=65 * DEGREES, theta=135 * DEGREES)
+                        self.set_camera_orientation(phi=65 * DEGREES, theta=45 * DEGREES)
 
                         # Text für die Zeit
                         if self.timing:
@@ -283,7 +283,7 @@ class AnimationAdapter:
                         if self.track_path:
                             self.add(*paths)
 
-                        self.set_camera_orientation(phi=65 * DEGREES, theta=135 * DEGREES)
+                        self.set_camera_orientation(phi=65 * DEGREES, theta=45 * DEGREES)
 
                         # Text für die Zeit
                         if self.timing:
