@@ -26,7 +26,9 @@ class AnimatedProgressBar(QProgressBar):
             QProgressBar::chunk {
                 background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                                                 stop:0 #1565C0, stop:1 #42a5f5);
-                border-radius: 0px;
+                border-radius: 15px;
+                margin: 0px;
+                min-width: 30px;  /* Ensure minimum width for proper rounding */
             }
         """)
         self._current = 0
@@ -37,8 +39,15 @@ class AnimatedProgressBar(QProgressBar):
         if total is not None:
             self._total = total
             self.setMaximum(total)
+            
         self._current = n
-        self.setValue(n)
+        
+        # Wenn wir am Ende sind (n >= total-1), setzen wir den Wert auf 100%
+        if total is not None and n >= total-1:
+            self.setValue(total)
+        else:
+            self.setValue(n)
+            
         QApplication.processEvents()  # Aktualisiere die GUI
 
 
