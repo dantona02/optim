@@ -225,7 +225,7 @@ class PlotPopupDialog(QDialog):
             # Erstelle neue Axen mit der gleichen Position
             ax_new = self.figure.add_axes([pos.x0, pos.y0, pos.width, pos.height])
             
-            # Kopiere alle Linien und ihre Daten
+            # Kopiere alle Linien und ihre Eigenschaften
             for line in ax_orig.get_lines():
                 x_data = line.get_xdata()
                 y_data = line.get_ydata()
@@ -234,12 +234,30 @@ class PlotPopupDialog(QDialog):
                 linewidth = line.get_linewidth()
                 marker = line.get_marker()
                 markersize = line.get_markersize()
+                alpha = line.get_alpha()
                 label = line.get_label()
                 
                 # Erstelle eine neue Linie mit den gleichen Eigenschaften
-                ax_new.plot(x_data, y_data, color=color, linestyle=linestyle, 
+                new_line = ax_new.plot(x_data, y_data, color=color, linestyle=linestyle, 
                            linewidth=linewidth, marker=marker, markersize=markersize, 
-                           label=label)
+                           label=label, alpha=alpha)[0]
+                
+                # Kopiere scatter plot Eigenschaften wenn vorhanden
+                if isinstance(line, matplotlib.lines.Line2D) and line.get_marker() not in ['', 'None', None]:
+                    new_line.set_markerfacecolor(line.get_markerfacecolor())
+                    new_line.set_markeredgecolor(line.get_markeredgecolor())
+                    new_line.set_markeredgewidth(line.get_markeredgewidth())
+                    
+            # Kopiere scatter plots separat
+            for collection in ax_orig.collections:
+                if isinstance(collection, matplotlib.collections.PathCollection):  # Scatter plot
+                    offsets = collection.get_offsets()
+                    if len(offsets) > 0:
+                        ax_new.scatter(offsets[:, 0], offsets[:, 1],
+                                     c=collection.get_facecolor(),
+                                     s=collection.get_sizes(),
+                                     alpha=collection.get_alpha(),
+                                     edgecolor=collection.get_edgecolor())
             
             # Kopiere die Achsenbeschriftungen und Titel
             ax_new.set_xlabel(ax_orig.get_xlabel())
@@ -248,17 +266,24 @@ class PlotPopupDialog(QDialog):
             
             # Kopiere die Legende, falls vorhanden
             if ax_orig.get_legend():
-                ax_new.legend()
+                ax_new.legend(framealpha=ax_orig.get_legend().get_frame().get_alpha())
             
-            # Kopiere die Gitterlinien
-            # In Matplotlib gibt es keine get_grid() Methode
-            # Stattdessen prüfen wir die Sichtbarkeit der vorhandenen Grid-Linien
-            ax_new.grid(ax_orig.xaxis._major_tick_kw.get('gridOn', False) or 
-                       ax_orig.yaxis._major_tick_kw.get('gridOn', False))
+            # Setze die Grid-Eigenschaften
+            ax_new.grid(True, alpha=0.3, linestyle='--')
+            
+            # Kopiere die Achseneinstellungen
+            ax_new.tick_params(axis='both', which='both', direction='in', top=True, right=True)
             
             # Kopiere die Achsenbegrenzungen
             ax_new.set_xlim(ax_orig.get_xlim())
             ax_new.set_ylim(ax_orig.get_ylim())
+            
+            # Kopiere die Achsenspines (Ränder)
+            for spine in ax_new.spines.values():
+                spine.set_visible(True)
+        
+        # Aktualisiere das Layout
+        self.figure.set_tight_layout(True)
         
         # Aktualisiere die Figur
         self.canvas.draw()

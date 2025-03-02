@@ -411,36 +411,56 @@ class PlotPanel(QWidget):
         m_z_total_np = m_z_total.cpu().numpy()
         m_trans_total_np = m_trans_total.cpu().numpy()
         m_trans_np = m_trans.cpu().numpy()
+
+        # Common style settings for all plots
+        plt_style = {
+            'grid.alpha': 0.3,
+            'grid.linestyle': '--',
+            'axes.spines.top': True,
+            'axes.spines.right': True
+        }
         
         # Plot Magnetization
         self.mag_figure.clear()
-        ax = self.mag_figure.add_subplot(111)
-        # Plot complete signal in gray
-        ax.plot(t_np, abs(m_trans_total_np), '--o', markersize=2, linewidth=1, color='gray', label=r'$|M_{xy}|$')
-        ax.set_xlabel('Time [s]')
-        ax.set_ylabel('Magnetization')
-        ax.grid(True)
-        ax.legend()
-        self.mag_canvas.draw()
+        with matplotlib.rc_context(plt_style):
+            ax = self.mag_figure.add_subplot(111)
+            # Plot complete signal
+            ax.plot(t_np, abs(m_trans_total_np), '--', color='royalblue', alpha=0.6, linewidth=1, label=r'$|M_{xy}|$')
+            ax.scatter(t_np, abs(m_trans_total_np), color='royalblue', alpha=0.8, s=10, edgecolor='royalblue', linewidth=1)
+            ax.set_xlabel('Time [s]')
+            ax.set_ylabel('Magnetization')
+            ax.grid(True)
+            ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+            ax.legend(framealpha=0.9)
+            self.mag_figure.set_tight_layout(True)
+            self.mag_canvas.draw()
         
         # Plot Phase
         self.phase_figure.clear()
-        ax = self.phase_figure.add_subplot(111)
-        # Plot complete signal in gray
-        ax.plot(t_np, np.angle(m_trans_np[0, :]), 'gray', alpha=0.3, label='Full Signal')
-        ax.set_xlabel('Time [s]')
-        ax.set_ylabel('Phase (rad)')
-        ax.grid(True)
-        ax.legend()
-        self.phase_canvas.draw()
+        with matplotlib.rc_context(plt_style):
+            ax = self.phase_figure.add_subplot(111)
+            # Plot complete signal
+            ax.plot(t_np, np.angle(m_trans_np[0, :]), '--', color='firebrick', alpha=0.6, linewidth=1, label='Phase')
+            ax.scatter(t_np, np.angle(m_trans_np[0, :]), color='firebrick', alpha=0.8, s=10, edgecolor='firebrick', linewidth=1)
+            ax.set_xlabel('Time [s]')
+            ax.set_ylabel('Phase (rad)')
+            ax.grid(True)
+            ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+            ax.legend(framealpha=0.9)
+            self.phase_figure.set_tight_layout(True)
+            self.phase_canvas.draw()
         
         # Plot Z-Magnetization
         self.mz_figure.clear()
-        ax = self.mz_figure.add_subplot(111)
-        # Plot complete signal in gray
-        ax.plot(t_np, m_z_total_np, 'gray', alpha=0.3, label='Full Signal')
-        ax.set_xlabel('Time [s]')
-        ax.set_ylabel('Z-Magnetization')
-        ax.grid(True)
-        ax.legend()
-        self.mz_canvas.draw()
+        with matplotlib.rc_context(plt_style):
+            ax = self.mz_figure.add_subplot(111)
+            # Plot complete signal
+            ax.plot(t_np, m_z_total_np, '--', color='forestgreen', alpha=0.6, linewidth=1, label='Z-Magnetization')
+            ax.scatter(t_np, m_z_total_np, color='forestgreen', alpha=0.8, s=10, edgecolor='forestgreen', linewidth=1)
+            ax.set_xlabel('Time [s]')
+            ax.set_ylabel('Z-Magnetization')
+            ax.grid(True)
+            ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+            ax.legend(framealpha=0.9)
+            self.mz_figure.set_tight_layout(True)
+            self.mz_canvas.draw()
