@@ -126,6 +126,7 @@ class BMCSimulatorGUI(QMainWindow):
         self.animation_thread = None
         self.temp_config_path = None
         self.latest_video_path = None
+        self.simulation_counter = {}  # Track number of simulations per sequence
         
         # Load default configuration values
         self._load_default_config()
@@ -390,8 +391,32 @@ class BMCSimulatorGUI(QMainWindow):
         # Store the sim_engine
         self.sim_engine = sim_engine
         
-        # Update plots
-        self.plot_panel.plot_results(self.sim_engine)
+        # Get base name from sequence file
+        base_name = Path(self.current_seq).stem
+        
+        # Update simulation counter for this sequence
+        if base_name not in self.simulation_counter:
+            self.simulation_counter[base_name] = 0
+        self.simulation_counter[base_name] += 1
+        
+        # Generate dataset name from sequence file and config
+        dataset_name = base_name
+        if self.simulation_counter[base_name] > 1:
+            dataset_name += f"_{self.simulation_counter[base_name]}"
+            
+        # Add config parameters to name if available
+        if self.config_params:
+            config_suffix = []
+            if 'cest' in self.config_params:
+                if 'offset' in self.config_params['cest']:
+                    config_suffix.append(f"off_{self.config_params['cest']['offset']}")
+                if 'exchange_rate' in self.config_params['cest']:
+                    config_suffix.append(f"k_{self.config_params['cest']['exchange_rate']}")
+            if config_suffix:
+                dataset_name += "_" + "_".join(config_suffix)
+        
+        # Update plots with dataset name
+        self.plot_panel.plot_results(self.sim_engine, dataset_name)
         
         # Update UI status
         self.control_panel.set_status("Simulation completed successfully", is_success=True)
@@ -525,4 +550,20 @@ class BMCSimulatorGUI(QMainWindow):
         
         # Accept the event to close the window
         event.accept()
+    
+    def reset_simulation_counter(self, base_name):
+        """Reset the simulation counter for a specific sequence"""
+        if base_name in self.simulation_counter:
+            # Find remaining datasets with this base name
+            remaining_count = 0
+            for dataset in self.plot_panel.dataset_panel.datasets.keys():
+                if dataset.startswith(base_name):
+                    remaining_count += 1
+            
+            if remaining_count == 0:
+                # If no datasets with this base name remain, reset the counter
+                del self.simulation_counter[base_name]
+            else:
+                # Update counter to match the number of remaining datasets
+                self.simulation_counter[base_name] = remaining_count
 

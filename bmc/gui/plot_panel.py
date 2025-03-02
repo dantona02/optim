@@ -1,18 +1,19 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox, QFrame, QPushButton,
-    QToolButton, QLabel
+    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
+    QPushButton, QToolButton
 )
 from PyQt6.QtCore import QLocale, Qt, QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QAction
 from pathlib import Path
+import re
 import matplotlib
 matplotlib.use('QtAgg')  # Use QtAgg for PyQt6
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import numpy as np
-import re
 from .plot_popup_dialog import PlotPopupDialog
+from .dataset_panel import DatasetControlPanel
 
 class CustomNavigationToolbar(NavigationToolbar):
     """Custom Navigation Toolbar with modified appearance"""
@@ -282,7 +283,6 @@ class PlotPanel(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Setze das Locale für alle QDoubleSpinBox-Widgets auf Englisch
         self.locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
         self.setup_ui()
         
@@ -357,24 +357,28 @@ class PlotPanel(QWidget):
         plot_layout.setContentsMargins(24, 24, 24, 24)
         plot_layout.setSpacing(16)
         
+        # Horizontal layout to hold plots and dataset control
+        h_layout = QHBoxLayout()
+        h_layout.setSpacing(0)  # Reduziere den Abstand für das Slide-out Panel
+        
         # Create tabs for different plots
         self.tabs = QTabWidget()
         
         # Tab for Magnetization Plot
         mag_widget = QWidget()
         mag_layout = QVBoxLayout(mag_widget)
-        mag_layout.setContentsMargins(8, 8, 8, 8)  # Reduzierte Abstände zum Rahmen
-        self.mag_figure = Figure(figsize=(12, 8))  # Größerer Plot
+        mag_layout.setContentsMargins(8, 8, 8, 8)
+        self.mag_figure = Figure(figsize=(12, 8))
         self.mag_canvas = FigureCanvas(self.mag_figure)
         self.mag_toolbar = CustomNavigationToolbar(self.mag_canvas, mag_widget)
         mag_layout.addWidget(self.mag_canvas)
-        mag_layout.addWidget(self.mag_toolbar)  # Toolbar unter dem Plot
+        mag_layout.addWidget(self.mag_toolbar)
         self.tabs.addTab(mag_widget, "Magnetization")
         
         # Tab for Phase Plot
         phase_widget = QWidget()
         phase_layout = QVBoxLayout(phase_widget)
-        phase_layout.setContentsMargins(8, 8, 8, 8)  # Reduzierte Abstände zum Rahmen
+        phase_layout.setContentsMargins(8, 8, 8, 8)
         self.phase_figure = Figure(figsize=(12, 8))  # Größerer Plot
         self.phase_canvas = FigureCanvas(self.phase_figure)
         self.phase_toolbar = CustomNavigationToolbar(self.phase_canvas, phase_widget)
@@ -393,17 +397,41 @@ class PlotPanel(QWidget):
         mz_layout.addWidget(self.mz_toolbar)  # Toolbar unter dem Plot
         self.tabs.addTab(mz_widget, "Z-Magnetization")
         
-        plot_layout.addWidget(self.tabs)
+        # Add tabs to horizontal layout
+        h_layout.addWidget(self.tabs, stretch=1)
+        
+        # Create and add dataset control panel
+        self.dataset_panel = DatasetControlPanel(self)
+        h_layout.addWidget(self.dataset_panel)
+        h_layout.setAlignment(self.dataset_panel, Qt.AlignmentFlag.AlignRight)
+        
+        # Add horizontal layout to main layout
+        plot_layout.addLayout(h_layout)
     
-    def plot_results(self, sim_engine):
+    def _on_dataset_deleted(self, dataset_name):
+        """Handle dataset deletion and reset counter if needed"""
+        # Extract base name from dataset (remove _1, _2, etc.)
+        base_name = dataset_name.split('_')[0]
+        # Find the main window instance
+        main_window = None
+        parent = self.parent()
+        while parent is not None:
+            if parent.__class__.__name__ == 'BMCSimulatorGUI':
+                main_window = parent
+                break
+            parent = parent.parent()
+        
+        # Reset the simulation counter if we found the main window
+        if main_window is not None:
+            main_window.reset_simulation_counter(base_name)
+    
+    def plot_results(self, sim_engine, dataset_name=None):
         """Plot the simulation results."""
         if not sim_engine:
             return
-            
-        # Get time slices and magnetization data with get_exact()
-        time_slices, magnetization_slices = sim_engine.get_exact()
         
-        # Get total magnetization data for background display
+        # Get data
+        time_slices, magnetization_slices = sim_engine.get_exact()
         t, m_z, m_z_total, m_trans, m_trans_total = sim_engine.get_mag()
         
         # Convert to NumPy arrays
@@ -411,56 +439,78 @@ class PlotPanel(QWidget):
         m_z_total_np = m_z_total.cpu().numpy()
         m_trans_total_np = m_trans_total.cpu().numpy()
         m_trans_np = m_trans.cpu().numpy()
-
-        # Common style settings for all plots
-        plt_style = {
-            'grid.alpha': 0.3,
-            'grid.linestyle': '--',
-            'axes.spines.top': True,
-            'axes.spines.right': True
+        
+        # Create dataset structure
+        dataset = {
+            't': t_np,
+            'm_z': m_z_total_np,
+            'm_trans': m_trans_total_np,
+            'm_trans_phase': m_trans_np
         }
         
-        # Plot Magnetization
+        # Add to dataset panel if name is provided
+        if dataset_name:
+            self.dataset_panel.add_dataset(dataset_name, dataset)
+        
+        self.update_plots()
+    
+    def update_plots(self):
+        """Update all plots with selected datasets"""
+        selected_datasets = self.dataset_panel.get_selected_datasets()
+        
+        # Color cycle for different datasets
+        colors = ['royalblue', 'firebrick', 'forestgreen', 'purple', 'orange', 'teal']
+        
+        # Update Magnetization plot
         self.mag_figure.clear()
-        with matplotlib.rc_context(plt_style):
-            ax = self.mag_figure.add_subplot(111)
-            # Plot complete signal
-            ax.plot(t_np, abs(m_trans_total_np), '--', color='royalblue', alpha=0.6, linewidth=1, label=r'$|M_{xy}|$')
-            ax.scatter(t_np, abs(m_trans_total_np), color='royalblue', alpha=0.8, s=10, edgecolor='royalblue', linewidth=1)
-            ax.set_xlabel('Time [s]')
-            ax.set_ylabel('Magnetization')
-            ax.grid(True)
-            ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+        ax = self.mag_figure.add_subplot(111)
+        for i, (name, data) in enumerate(selected_datasets):
+            color = colors[i % len(colors)]
+            ax.plot(data['t'], abs(data['m_trans']), '--', 
+                   color=color, alpha=0.6, linewidth=1, label=f'{name}')
+            ax.scatter(data['t'], abs(data['m_trans']), 
+                      color=color, alpha=0.8, s=10, edgecolor=color, linewidth=1)
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Magnetization')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+        if selected_datasets:
             ax.legend(framealpha=0.9)
-            self.mag_figure.set_tight_layout(True)
-            self.mag_canvas.draw()
+        self.mag_figure.set_tight_layout(True)
+        self.mag_canvas.draw()
         
-        # Plot Phase
+        # Update Phase plot
         self.phase_figure.clear()
-        with matplotlib.rc_context(plt_style):
-            ax = self.phase_figure.add_subplot(111)
-            # Plot complete signal
-            ax.plot(t_np, np.angle(m_trans_np[0, :]), '--', color='firebrick', alpha=0.6, linewidth=1, label='Phase')
-            ax.scatter(t_np, np.angle(m_trans_np[0, :]), color='firebrick', alpha=0.8, s=10, edgecolor='firebrick', linewidth=1)
-            ax.set_xlabel('Time [s]')
-            ax.set_ylabel('Phase (rad)')
-            ax.grid(True)
-            ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+        ax = self.phase_figure.add_subplot(111)
+        for i, (name, data) in enumerate(selected_datasets):
+            color = colors[i % len(colors)]
+            ax.plot(data['t'], np.angle(data['m_trans_phase'][0, :]), '--', 
+                   color=color, alpha=0.6, linewidth=1, label=f'{name}')
+            ax.scatter(data['t'], np.angle(data['m_trans_phase'][0, :]), 
+                      color=color, alpha=0.8, s=10, edgecolor=color, linewidth=1)
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Phase (rad)')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+        if selected_datasets:
             ax.legend(framealpha=0.9)
-            self.phase_figure.set_tight_layout(True)
-            self.phase_canvas.draw()
+        self.phase_figure.set_tight_layout(True)
+        self.phase_canvas.draw()
         
-        # Plot Z-Magnetization
+        # Update Z-Magnetization plot
         self.mz_figure.clear()
-        with matplotlib.rc_context(plt_style):
-            ax = self.mz_figure.add_subplot(111)
-            # Plot complete signal
-            ax.plot(t_np, m_z_total_np, '--', color='forestgreen', alpha=0.6, linewidth=1, label='Z-Magnetization')
-            ax.scatter(t_np, m_z_total_np, color='forestgreen', alpha=0.8, s=10, edgecolor='forestgreen', linewidth=1)
-            ax.set_xlabel('Time [s]')
-            ax.set_ylabel('Z-Magnetization')
-            ax.grid(True)
-            ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+        ax = self.mz_figure.add_subplot(111)
+        for i, (name, data) in enumerate(selected_datasets):
+            color = colors[i % len(colors)]
+            ax.plot(data['t'], data['m_z'], '--', 
+                   color=color, alpha=0.6, linewidth=1, label=f'{name}')
+            ax.scatter(data['t'], data['m_z'], 
+                      color=color, alpha=0.8, s=10, edgecolor=color, linewidth=1)
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Z-Magnetization')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+        if selected_datasets:
             ax.legend(framealpha=0.9)
-            self.mz_figure.set_tight_layout(True)
-            self.mz_canvas.draw()
+        self.mz_figure.set_tight_layout(True)
+        self.mz_canvas.draw()
