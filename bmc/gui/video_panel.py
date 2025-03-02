@@ -182,6 +182,7 @@ class VideoPanel(QWidget):
             QSlider {
                 background: transparent;
                 padding: 12px 0px;
+                opacity: 1;
             }
             
             QSlider::groove:horizontal {
@@ -206,6 +207,22 @@ class VideoPanel(QWidget):
             QSlider::sub-page:horizontal {
                 background: #2962FF;
                 border-radius: 2px;
+            }
+
+            QSlider:disabled {
+                opacity: 0.35;
+            }
+
+            QSlider::handle:horizontal:disabled {
+                background: #666666;
+            }
+
+            QSlider::sub-page:horizontal:disabled {
+                background: #666666;
+            }
+
+            QSlider::groove:horizontal:disabled {
+                background: rgba(68, 68, 68, 0.4);
             }
         """)
         controls_layout.addWidget(self.position_slider)

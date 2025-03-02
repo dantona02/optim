@@ -19,6 +19,9 @@ class AnimatedToggle(QCheckBox):
         ):
         super().__init__(parent)
         
+        # Initialize as unchecked
+        self.setChecked(False)
+        
         # Save our properties on the object via self, so we can access them later
         # in the paintEvent.
         self._bar_brush = QBrush(bar_color)

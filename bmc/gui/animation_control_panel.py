@@ -149,7 +149,7 @@ class AnimationControlPanel(QWidget):
             pulse_checked_color="#4400B0EE"
         )
         self.track_path_toggle.setFixedSize(self.track_path_toggle.sizeHint())
-        self.track_path_toggle.setChecked(True)  # Default on
+        self.track_path_toggle.setChecked(False)  # Default off
         
         track_path_layout.addWidget(track_path_label)
         track_path_layout.addWidget(self.track_path_toggle)
@@ -206,7 +206,7 @@ class AnimationControlPanel(QWidget):
             pulse_checked_color="#4400B0EE"
         )
         self.animate_cest_toggle.setFixedSize(self.animate_cest_toggle.sizeHint())
-        self.animate_cest_toggle.setChecked(True)  # Default on
+        self.animate_cest_toggle.setChecked(False)  # Default off
         
         animate_cest_layout.addWidget(animate_cest_label)
         animate_cest_layout.addWidget(self.animate_cest_toggle)
