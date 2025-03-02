@@ -1,13 +1,62 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox
+    QWidget, QVBoxLayout, QTabWidget, QDoubleSpinBox, QFrame, QPushButton
 )
-from PyQt6.QtCore import QLocale, Qt
+from PyQt6.QtCore import QLocale, Qt, QSize
 import matplotlib
 matplotlib.use('QtAgg')  # Use QtAgg for PyQt6
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import numpy as np
 
+class CustomNavigationToolbar(NavigationToolbar):
+    """Custom Navigation Toolbar with modified appearance"""
+    def __init__(self, canvas, parent):
+        super().__init__(canvas, parent)
+        # Verkleinere die Toolbar-Icons
+        for child in self.children():
+            if isinstance(child, QWidget):  # Nur QWidget-Objekte bearbeiten
+                child.setMaximumHeight(24)
+                child.setMaximumWidth(24)
+                if isinstance(child, QPushButton):
+                    child.setIconSize(QSize(16, 16))  # Kleinere Icons
+        
+        # Style der Toolbar
+        self.setStyleSheet("""
+            QToolBar {
+                background-color: transparent;
+                border: none;
+                spacing: 2px;
+                max-height: 28px;
+            }
+            QToolButton {
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 3px;
+                padding: 2px;
+                color: #888888;
+            }
+            QToolButton:hover {
+                background-color: rgba(56, 56, 56, 0.6);
+                border: 1px solid #404040;
+                color: #E0E0E0;
+            }
+            QToolButton:pressed {
+                background-color: rgba(45, 45, 45, 0.8);
+                border: 1px solid #2962FF;
+                color: #2962FF;
+            }
+            QToolButton[popupMode="1"] {
+                padding-right: 15px;
+            }
+            QToolButton::menu-button {
+                border: none;
+            }
+            QToolButton::menu-button:hover {
+                background-color: rgba(56, 56, 56, 0.6);
+                border: 1px solid #404040;
+            }
+        """)
 
 class PlotPanel(QWidget):
     """A class representing the plot panel in the BMC Simulator GUI."""
@@ -98,7 +147,9 @@ class PlotPanel(QWidget):
         mag_layout.setContentsMargins(8, 8, 8, 8)  # Reduzierte Abstände zum Rahmen
         self.mag_figure = Figure(figsize=(12, 8))  # Größerer Plot
         self.mag_canvas = FigureCanvas(self.mag_figure)
+        self.mag_toolbar = CustomNavigationToolbar(self.mag_canvas, mag_widget)
         mag_layout.addWidget(self.mag_canvas)
+        mag_layout.addWidget(self.mag_toolbar)  # Toolbar unter dem Plot
         self.tabs.addTab(mag_widget, "Magnetization")
         
         # Tab for Phase Plot
@@ -107,7 +158,9 @@ class PlotPanel(QWidget):
         phase_layout.setContentsMargins(8, 8, 8, 8)  # Reduzierte Abstände zum Rahmen
         self.phase_figure = Figure(figsize=(12, 8))  # Größerer Plot
         self.phase_canvas = FigureCanvas(self.phase_figure)
+        self.phase_toolbar = CustomNavigationToolbar(self.phase_canvas, phase_widget)
         phase_layout.addWidget(self.phase_canvas)
+        phase_layout.addWidget(self.phase_toolbar)  # Toolbar unter dem Plot
         self.tabs.addTab(phase_widget, "Phase")
         
         # Tab for Z-Magnetization
@@ -116,7 +169,9 @@ class PlotPanel(QWidget):
         mz_layout.setContentsMargins(8, 8, 8, 8)  # Reduzierte Abstände zum Rahmen
         self.mz_figure = Figure(figsize=(12, 8))  # Größerer Plot
         self.mz_canvas = FigureCanvas(self.mz_figure)
+        self.mz_toolbar = CustomNavigationToolbar(self.mz_canvas, mz_widget)
         mz_layout.addWidget(self.mz_canvas)
+        mz_layout.addWidget(self.mz_toolbar)  # Toolbar unter dem Plot
         self.tabs.addTab(mz_widget, "Z-Magnetization")
         
         plot_layout.addWidget(self.tabs)
