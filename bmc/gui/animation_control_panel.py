@@ -335,7 +335,7 @@ class AnimationControlPanel(QWidget):
         self.progress.setFormat("%v/%m (%p%)")
         self.progress.setStyleSheet("""
             QProgressBar {
-                border: none;
+                border: 2px solid #333333;
                 background-color: #242424;
                 min-height: 28px;
                 max-height: 28px;
@@ -345,13 +345,14 @@ class AnimationControlPanel(QWidget):
                 color: white;
                 font-weight: 600;
                 font-size: 13px;
-                border: 2px solid #333333;
+                padding: 0px;
             }
             
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                                           stop:0 #0AC18E, stop:0.3 #22E09A, stop:1 #4ADE80);
                 border-radius: 12px;
+                min-width: 24px;
             }
         """)
         control_layout.addWidget(self.progress)

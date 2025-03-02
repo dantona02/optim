@@ -14,26 +14,58 @@ class AnimatedProgressBar(QProgressBar):
         self.setStyleSheet("""
             QProgressBar {
                 border: none;
-                background-color: #2b2b2b;
-                min-height: 30px;
+                background-color: #242424;
+                min-height: 28px;
+                max-height: 28px;
                 text-align: center;
                 color: white;
-                font-weight: bold;
+                font-weight: 600;
                 font-size: 13px;
-                margin: 0px;
-            }
-            
-            QProgressBar::chunk {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                                                stop:0 #1565C0, stop:1 #42a5f5);
-                border-radius: 15px;
-                margin: 0px;
-                min-width: 30px;  /* Ensure minimum width for proper rounding */
+                margin: 8px 0px;
+                border: 2px solid #333333;
+                border-radius: 14px;
             }
         """)
         self._current = 0
         self._total = 100
         self.setFormat("%v/%m (%p%)")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+    def paintEvent(self, event):
+        from PyQt6.QtGui import QPainter, QColor, QPainterPath
+        from PyQt6.QtCore import QRectF
+        
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Zeichne den Hintergrund
+        bgPath = QPainterPath()
+        bgRect = QRectF(2, 2, self.width()-4, self.height()-4)
+        bgPath.addRoundedRect(bgRect, 12, 12)
+        painter.fillPath(bgPath, QColor("#242424"))
+        
+        # Berechne die Breite des Fortschrittsbalkens
+        progress = self.value() / (self.maximum() - self.minimum())
+        progressWidth = progress * (self.width() - 4)
+        
+        # Zeichne den Fortschrittsbalken
+        if progressWidth > 0:
+            progressPath = QPainterPath()
+            progressRect = QRectF(2, 2, max(24, progressWidth), self.height()-4)
+            progressPath.addRoundedRect(progressRect, 12, 12)
+            gradient = self.gradient()
+            painter.fillPath(progressPath, gradient)
+        
+        # Zeichne den Text
+        painter.setPen(QColor("white"))
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.text())
+        
+    def gradient(self):
+        from PyQt6.QtGui import QLinearGradient, QColor
+        gradient = QLinearGradient(0, 0, self.width(), 0)
+        gradient.setColorAt(0, QColor("#1565C0"))
+        gradient.setColorAt(1, QColor("#42a5f5"))
+        return gradient
 
     def update_progress(self, n, total=None):
         if total is not None:
