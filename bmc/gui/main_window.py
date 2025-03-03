@@ -23,6 +23,7 @@ from bmc.gui.about_page import AboutPage
 from bmc.gui.animation_control_panel import AnimationControlPanel
 from bmc.gui.video_panel import VideoPanel
 from bmc.gui.animation_worker import AnimationWorker
+from bmc.gui.settings_page import SettingsPage
 
 
 class SimulationWorker(QThread):
@@ -232,10 +233,7 @@ class BMCSimulatorGUI(QMainWindow):
         
 
         # Create placeholders for other pages
-        self.settings_page = QWidget()
-        settings_layout = QHBoxLayout(self.settings_page)
-        settings_layout.addWidget(QWidget())  # Placeholder
-        
+        self.settings_page = SettingsPage()
         self.about_page = AboutPage()
         
         # Add pages to stack
@@ -255,9 +253,8 @@ class BMCSimulatorGUI(QMainWindow):
         page_index = {
             "simulation": 0,
             "animation": 1,
-            "pulseseq": 2,
-            "settings": 3,
-            "about": 4
+            "settings": 2,
+            "about": 3
         }.get(page_name, 0)
         
         # Setze den korrekten Index und stelle sicher, dass der Button aktiv bleibt
