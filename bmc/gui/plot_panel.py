@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import matplotlib
 matplotlib.use('QtAgg')  # Use QtAgg for PyQt6
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -283,12 +284,15 @@ class PlotPanel(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Define plot colors
-        self.colors = ['royalblue', 'firebrick', 'forestgreen', 'purple', 'orange', 'teal']
         self.dataset_colors = {}  # Maps dataset names to colors
-        self.color_index = 0
+        self.color_props = {}  # Store matplotlib properties
         self.locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
         self.setup_ui()
+        
+        # Initialize figures with default color cycle
+        self._setup_figure_colors(self.mag_figure)
+        self._setup_figure_colors(self.phase_figure)
+        self._setup_figure_colors(self.mz_figure)
         
         # Set the style for the plot panel and tabs
         self.setStyleSheet("""
@@ -412,6 +416,21 @@ class PlotPanel(QWidget):
         # Add horizontal layout to main layout
         plot_layout.addLayout(h_layout)
     
+    def _setup_figure_colors(self, figure):
+        """Setup the color cycle for a figure and store the properties"""
+        ax = figure.add_subplot(111)
+        # Get the current color cycle from rcParams instead of the axes
+        self.color_props = {'color': plt.rcParams['axes.prop_cycle'].by_key()['color']}
+        figure.clear()  # Clear the temporary axis
+        
+    def _get_next_color(self, dataset_name):
+        """Get next color from matplotlib's color cycle"""
+        if dataset_name not in self.dataset_colors:
+            colors = self.color_props['color']
+            next_color = colors[len(self.dataset_colors) % len(colors)]
+            self.dataset_colors[dataset_name] = next_color
+        return self.dataset_colors[dataset_name]
+    
     def _on_dataset_deleted(self, dataset_name):
         """Handle dataset deletion and reset counter if needed"""
         # Extract base name from dataset (remove _1, _2, etc.)
@@ -454,12 +473,8 @@ class PlotPanel(QWidget):
         
         # Add to dataset panel if name is provided
         if dataset_name:
-            # Assign a color to this dataset if it doesn't have one
-            if dataset_name not in self.dataset_colors:
-                self.dataset_colors[dataset_name] = self.colors[self.color_index % len(self.colors)]
-                self.color_index += 1
-            
-            dataset['color'] = self.dataset_colors[dataset_name]
+            # Get color from matplotlib's color cycle
+            dataset['color'] = self._get_next_color(dataset_name)
             self.dataset_panel.add_dataset(dataset_name, dataset)
         
         self.update_plots()
@@ -525,3 +540,12 @@ class PlotPanel(QWidget):
     def get_dataset_color(self, dataset_name):
         """Get the color assigned to a dataset"""
         return self.dataset_colors.get(dataset_name)
+    
+    def reset_colors(self):
+        """Reset all color-related properties to initial state"""
+        self.dataset_colors.clear()  # Clear color assignments
+        
+        # Re-initialize the color properties from matplotlib
+        self._setup_figure_colors(self.mag_figure)
+        self._setup_figure_colors(self.phase_figure)
+        self._setup_figure_colors(self.mz_figure)

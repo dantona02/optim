@@ -307,31 +307,44 @@ class DatasetControlPanel(QFrame):
         # Create row layout with better spacing and alignment
         row_layout = QHBoxLayout(row_widget)
         row_layout.setContentsMargins(2, 2, 2, 2)
-        row_layout.setSpacing(6)  # Optimaler Abstand zwischen Checkbox und Button
+        row_layout.setSpacing(6)
         
-        # Create checkbox with custom color
+        # Create checkbox with color from plot panel
         checkbox = QCheckBox(name)
         checkbox.setChecked(True)
         checkbox.stateChanged.connect(lambda state, cb=checkbox: self.on_checkbox_state_changed(state, cb))
         
-        # Get color from parent plot panel
-        if self.parent_plot_panel and hasattr(self.parent_plot_panel, 'get_dataset_color'):
+        # Get color from parent plot panel and apply to checkbox
+        if self.parent_plot_panel and self.parent_plot_panel.get_dataset_color(name):
             color = self.parent_plot_panel.get_dataset_color(name)
-            if color:
-                checkbox.setStyleSheet(f"QCheckBox:checked {{ color: {color}; }}")
+            checkbox.setStyleSheet(f"""
+                QCheckBox {{
+                    color: {color};
+                }}
+                QCheckBox:checked {{
+                    color: {color};
+                }}
+                QCheckBox:unchecked {{
+                    color: #888888;
+                }}
+            """)
         
-        # Delete button with improved visibility
+        # Add checkbox to row
+        row_layout.addWidget(checkbox)
+        
+        # Create delete button with improved visibility
         delete_button = QToolButton()
+        delete_button.setIcon(QIcon(str(Path(__file__).resolve().parent / "images" / "trash.svg")))
         delete_button.setObjectName("deleteButton")
-        delete_button.setIcon(QIcon(str(Path(__file__).resolve().parent / 'images' / 'trash.svg')))
-        delete_button.setIconSize(QSize(18, 18))  # Optimierte Icongröße
-        delete_button.clicked.connect(lambda: self.delete_dataset(name))
+        delete_button.setIconSize(QSize(14, 14))
+        delete_button.clicked.connect(lambda: self.remove_dataset(name))
         
-        # Add widgets to row with proper alignment
-        row_layout.addWidget(checkbox, 1)  # Checkbox takes available space
-        row_layout.addWidget(delete_button, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        # Add delete button to row
+        row_layout.addWidget(delete_button)
+        row_layout.setAlignment(delete_button, Qt.AlignmentFlag.AlignRight)
         
-        return row_widget, checkbox, delete_button
+        # Return tuple of components
+        return (row_widget, checkbox, delete_button)
 
     def on_checkbox_state_changed(self, state, checkbox):
         """Handle checkbox state changes"""
@@ -360,6 +373,10 @@ class DatasetControlPanel(QFrame):
             self.dataset_deleted.emit(name)
             self.update_plots()
     
+    def remove_dataset(self, name):
+        """Remove a dataset from the panel"""
+        self.delete_dataset(name)
+    
     def clear_all_datasets(self):
         """Remove all datasets"""
         dataset_names = list(self.datasets.keys())
@@ -370,6 +387,24 @@ class DatasetControlPanel(QFrame):
             row_widget.setParent(None)
             row_widget.deleteLater()
         self.datasets.clear()
+        
+        # Reset color properties in parent plot panel
+        if self.parent_plot_panel and hasattr(self.parent_plot_panel, 'reset_colors'):
+            self.parent_plot_panel.reset_colors()
+        
+        # Find main window to reset simulation counters
+        main_window = None
+        parent = self.parent_plot_panel
+        while parent is not None:
+            if parent.__class__.__name__ == 'BMCSimulatorGUI':
+                main_window = parent
+                break
+            parent = parent.parent()
+        
+        # Reset all simulation counters if main window is found
+        if main_window and hasattr(main_window, 'reset_all_simulation_counters'):
+            main_window.reset_all_simulation_counters()
+        
         # Emit signal that all datasets were deleted
         for name in dataset_names:
             self.dataset_deleted.emit(name)

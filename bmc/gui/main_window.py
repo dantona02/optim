@@ -551,6 +551,10 @@ class BMCSimulatorGUI(QMainWindow):
         # Accept the event to close the window
         event.accept()
     
+    def reset_all_simulation_counters(self):
+        """Reset all simulation counters to their initial state"""
+        self.simulation_counter.clear()  # Reset all counters
+    
     def reset_simulation_counter(self, base_name):
         """Reset the simulation counter for a specific sequence"""
         if base_name in self.simulation_counter:
