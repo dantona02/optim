@@ -230,11 +230,8 @@ class BMCSimulatorGUI(QMainWindow):
         animation_layout.setStretch(0, 0)  # Control panel - no stretch
         animation_layout.setStretch(1, 1)  # Video panel - should stretch
         
+
         # Create placeholders for other pages
-        self.pulseseq_page = QWidget()
-        pulseseq_layout = QHBoxLayout(self.pulseseq_page)
-        pulseseq_layout.addWidget(QWidget())  # Placeholder
-        
         self.settings_page = QWidget()
         settings_layout = QHBoxLayout(self.settings_page)
         settings_layout.addWidget(QWidget())  # Placeholder
@@ -244,7 +241,6 @@ class BMCSimulatorGUI(QMainWindow):
         # Add pages to stack
         self.stack.addWidget(self.main_page)
         self.stack.addWidget(self.animation_page)
-        self.stack.addWidget(self.pulseseq_page)
         self.stack.addWidget(self.settings_page)
         self.stack.addWidget(self.about_page)
         
