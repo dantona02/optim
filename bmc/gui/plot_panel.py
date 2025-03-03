@@ -252,7 +252,7 @@ class CustomNavigationToolbar(NavigationToolbar):
     
     def _open_in_popup(self):
         """Öffnet den aktuellen Plot in einem separaten Popup-Fenster"""
-        figure = self.canvas.figure
+        figure = self.canvas.figure  # Use self.canvas instead of canvas
         title = ""
         
         # Ermittle den Titel des aktuellen Tabs
@@ -283,6 +283,10 @@ class PlotPanel(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Define plot colors
+        self.colors = ['royalblue', 'firebrick', 'forestgreen', 'purple', 'orange', 'teal']
+        self.dataset_colors = {}  # Maps dataset names to colors
+        self.color_index = 0
         self.locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
         self.setup_ui()
         
@@ -450,22 +454,25 @@ class PlotPanel(QWidget):
         
         # Add to dataset panel if name is provided
         if dataset_name:
+            # Assign a color to this dataset if it doesn't have one
+            if dataset_name not in self.dataset_colors:
+                self.dataset_colors[dataset_name] = self.colors[self.color_index % len(self.colors)]
+                self.color_index += 1
+            
+            dataset['color'] = self.dataset_colors[dataset_name]
             self.dataset_panel.add_dataset(dataset_name, dataset)
         
         self.update_plots()
-    
+        
     def update_plots(self):
         """Update all plots with selected datasets"""
         selected_datasets = self.dataset_panel.get_selected_datasets()
         
-        # Color cycle for different datasets
-        colors = ['royalblue', 'firebrick', 'forestgreen', 'purple', 'orange', 'teal']
-        
         # Update Magnetization plot
         self.mag_figure.clear()
         ax = self.mag_figure.add_subplot(111)
-        for i, (name, data) in enumerate(selected_datasets):
-            color = colors[i % len(colors)]
+        for name, data in selected_datasets:
+            color = data['color']  # Use stored color for dataset
             ax.plot(data['t'], abs(data['m_trans']), '--', 
                    color=color, alpha=0.6, linewidth=1, label=f'{name}')
             ax.scatter(data['t'], abs(data['m_trans']), 
@@ -482,8 +489,8 @@ class PlotPanel(QWidget):
         # Update Phase plot
         self.phase_figure.clear()
         ax = self.phase_figure.add_subplot(111)
-        for i, (name, data) in enumerate(selected_datasets):
-            color = colors[i % len(colors)]
+        for name, data in selected_datasets:
+            color = data['color']  # Use stored color for dataset
             ax.plot(data['t'], np.angle(data['m_trans_phase'][0, :]), '--', 
                    color=color, alpha=0.6, linewidth=1, label=f'{name}')
             ax.scatter(data['t'], np.angle(data['m_trans_phase'][0, :]), 
@@ -500,8 +507,8 @@ class PlotPanel(QWidget):
         # Update Z-Magnetization plot
         self.mz_figure.clear()
         ax = self.mz_figure.add_subplot(111)
-        for i, (name, data) in enumerate(selected_datasets):
-            color = colors[i % len(colors)]
+        for name, data in selected_datasets:
+            color = data['color']  # Use stored color for dataset
             ax.plot(data['t'], data['m_z'], '--', 
                    color=color, alpha=0.6, linewidth=1, label=f'{name}')
             ax.scatter(data['t'], data['m_z'], 
@@ -514,3 +521,7 @@ class PlotPanel(QWidget):
             ax.legend(framealpha=0.9)
         self.mz_figure.set_tight_layout(True)
         self.mz_canvas.draw()
+    
+    def get_dataset_color(self, dataset_name):
+        """Get the color assigned to a dataset"""
+        return self.dataset_colors.get(dataset_name)

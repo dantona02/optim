@@ -16,10 +16,11 @@ class DatasetControlPanel(QFrame):
         self.datasets = {}
         self.is_expanded = False
         self.normal_width = 220
-        self.collapsed_width = 20  # Reduzierte Breite
+        self.collapsed_width = 20
+        self.parent_plot_panel = parent  # Store reference to plot panel
         self.setup_ui()
         
-        # Style
+        # Style with dynamic color for checkboxes
         self.setStyleSheet("""
             /* Main Frame */
             QFrame {
@@ -112,7 +113,6 @@ class DatasetControlPanel(QFrame):
             
             /* Dataset Checkboxes */
             QCheckBox {
-                color: #E0E0E0;
                 padding: 6px 8px;
                 margin: 1px 0px;
                 border-radius: 3px;
@@ -120,8 +120,8 @@ class DatasetControlPanel(QFrame):
                 background-color: transparent;
             }
             
-            QCheckBox:checked {
-                color: #2962FF;
+            QCheckBox:unchecked {
+                color: #E0E0E0;
             }
             
             /* Delete Button */
@@ -309,10 +309,16 @@ class DatasetControlPanel(QFrame):
         row_layout.setContentsMargins(2, 2, 2, 2)
         row_layout.setSpacing(6)  # Optimaler Abstand zwischen Checkbox und Button
         
-        # Checkbox mit klarem Text
+        # Create checkbox with custom color
         checkbox = QCheckBox(name)
         checkbox.setChecked(True)
-        checkbox.stateChanged.connect(self.update_plots)
+        checkbox.stateChanged.connect(lambda state, cb=checkbox: self.on_checkbox_state_changed(state, cb))
+        
+        # Get color from parent plot panel
+        if self.parent_plot_panel and hasattr(self.parent_plot_panel, 'get_dataset_color'):
+            color = self.parent_plot_panel.get_dataset_color(name)
+            if color:
+                checkbox.setStyleSheet(f"QCheckBox:checked {{ color: {color}; }}")
         
         # Delete button with improved visibility
         delete_button = QToolButton()
@@ -326,6 +332,10 @@ class DatasetControlPanel(QFrame):
         row_layout.addWidget(delete_button, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         return row_widget, checkbox, delete_button
+
+    def on_checkbox_state_changed(self, state, checkbox):
+        """Handle checkbox state changes"""
+        self.update_plots()
     
     def add_dataset(self, name, data):
         """Add a new dataset to the panel"""
