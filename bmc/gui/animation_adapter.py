@@ -114,9 +114,15 @@ class AnimationAdapter:
             middle_idx = np.where(z_positions == 0)[0][0]
             m_vec_middle = m_vec_water[middle_idx] if total_mag else None
             
-            # Erstelle Ausgabeverzeichnisse
-            media_dir = Path(__file__).resolve().parent.parent.parent / "media"
-            output_dir = media_dir / "custom_animations"
+            # Erstelle Ausgabeverzeichnisse - mit Option für benutzerdefiniertes Verzeichnis
+            if "output_dir" in animation_params and animation_params["output_dir"]:
+                output_dir = Path(animation_params["output_dir"])
+            else:
+                # Fallback auf Standard-Verzeichnis
+                media_dir = Path(__file__).resolve().parent.parent.parent / "media"
+                output_dir = media_dir / "custom_animations"
+            
+            # Stelle sicher, dass das Ausgabeverzeichnis existiert
             output_dir.mkdir(exist_ok=True, parents=True)
             
             # Generiere eine eindeutige ID für diese Animation

@@ -6,7 +6,7 @@ import time
 from bmc.utils.global_device import GLOBAL_DEVICE
 from datetime import timedelta
 
-from typing import Tuple, Union
+from typing import Tuple, Union, Callable, Optional
 # from bmc.bmc_solver import BlochMcConnellSolver
 from bmc.solver import BlochMcConnellSolver
 from bmc.bmc_tool import BMCTool
@@ -21,7 +21,7 @@ from bmc.utils.webhook import DiscordNotifier
 # torch.backends.cuda.preferred_linalg_library('magma')
 
 class BMCSim(BMCTool):
-    def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, n_backlog: str | int, verbose: bool = True, webhook: bool = False, **kwargs) -> None:
+    def __init__(self, adc_time: float, params: Params, seq_file: str | Path, z_positions: torch.Tensor, n_backlog: str | int, verbose: bool = True, webhook: bool = False, progress_callback: Optional[Callable[[int, int], None]] = None, **kwargs) -> None:
         super().__init__(params, seq_file, verbose, **kwargs)
         self.z_positions = z_positions.to(GLOBAL_DEVICE)  # Torch-Tensor
         self.n_isochromats = len(self.z_positions)
@@ -51,6 +51,8 @@ class BMCSim(BMCTool):
         self.time_sampling_size = torch.tensor([], device=GLOBAL_DEVICE)
 
         self.webhook = webhook
+        # Füge Callback für Fortschrittsbenachrichtigung hinzu
+        self.progress_callback = progress_callback
 
 
     def run_adc(self, block, current_adc, mag, counter) -> Tuple[int, torch.Tensor]:
@@ -263,47 +265,54 @@ class BMCSim(BMCTool):
         except AttributeError:
             block_events = self.seq.dict_block_events
 
+        # Bestimme den Iterationsmodus basierend auf verbose-Flag und progress_callback
+        total_events = len(block_events)
         if self.verbose:
-            loop_block_events = tqdm(enumerate(block_events, start=1), total=len(block_events), desc="BMCTool simulation")
+            loop_block_events = tqdm(enumerate(block_events, start=1), total=total_events, desc="BMCTool simulation")
         else:
-            loop_block_events = range(1, len(block_events) + 1)
+            loop_block_events = enumerate(block_events, start=1)
 
+        # Discord-Webhook-Benachrichtigungen einrichten
         if self.webhook:
             notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/1321535040164728932/LcXvJRZFlns6w18hN4mDkCWuQawYTcWao1GLUOnDYK9QpVUw3lxLLUNl0zIsXdcVBNWK",
-                                    total_steps=len(block_events),
+                                    total_steps=total_events,
                                     seq_file=self.seq_file,
                                     n_cest_pools=len(self.params.cest_pools),
                                     n_isochromats=self.n_isochromats,
-                                    #device=f"{GLOBAL_DEVICE.type} - {torch.cuda.get_device_name(GLOBAL_DEVICE.index)}"
                                     device=f"{GLOBAL_DEVICE.type}"
                                     )
             notifier.send_initial_embed()
 
         try:
-            total_events = len(block_events)
-            if self.webhook:
-                start_time = time.time()
-                for i, block_event in loop_block_events:
-                    block = self.seq.get_block(block_event)
-                    current_adc, mag = self.run_adc(block, current_adc, mag)
-                    notifier.update_progress(i)
-            else:
-                for i, block_event in loop_block_events:
-                    counter = np.abs(total_events - i)
-                    block = self.seq.get_block(block_event)
-                    current_adc, mag = self.run_adc(block, current_adc, mag, counter)
+            start_time = time.time()
+            
+            # Hauptsimulationsschleife
+            for i, block_event in loop_block_events:
+                counter = np.abs(total_events - i)
+                block = self.seq.get_block(block_event)
+                current_adc, mag = self.run_adc(block, current_adc, mag, counter)
                 
+                # Progress updates über WebSocket senden, wenn Callback vorhanden
+                if self.progress_callback:
+                    self.progress_callback(i, total_events)
+                
+                # Discord-Webhook-Updates senden
+                if self.webhook:
+                    notifier.update_progress(i)
+            
+            # Ergebnisse zuschneiden
             self.m_out = self.m_out[:, :, :self.t.numel()]
-            print(self.events)
-
+            
+            # Abschließende Benachrichtigung für Discord-Webhook
             if self.webhook:
                 end_time = time.time()
                 elapsed_time = timedelta(seconds=end_time - start_time)
                 notifier.send_completion_embed(elapsed_time)
                 
         except Exception as e:
+            # Fehlerbenachrichtigung für Discord-Webhook
             if self.webhook:
-                notifier.send_failed_embed(e)
+                notifier.send_failed_embed(str(e))
             raise
     
 
@@ -379,6 +388,10 @@ class BMCSim(BMCTool):
         magnetization_slices = []
         start = 0
 
+        print("\n=== Debug: get_exact() ===")
+        print(f"Total time samples: {len(self.t)}")
+        print(f"Time sampling sizes: {self.time_sampling_size}")
+        print(f"Events: {self.events}")
     
         _, _, _, _, magnetization = self.get_mag()
         
@@ -386,12 +399,21 @@ class BMCSim(BMCTool):
         magnetization = (magnetization if isinstance(magnetization, torch.Tensor)
                         else torch.tensor(magnetization))
         
-        for size in self.time_sampling_size:
+        for i, size in enumerate(self.time_sampling_size):
             end = int(start + size)
-            time_slices.append(t[start:end])
-            magnetization_slices.append(magnetization[start:end])
+            time_slice = t[start:end]
+            mag_slice = magnetization[start:end]
+            print(f"\nSlice {i}:")
+            print(f"  Event: {self.events[i] if i < len(self.events) else 'No event'}")
+            print(f"  Size: {size}")
+            print(f"  Time range: {time_slice[0].item():.4f}s - {time_slice[-1].item():.4f}s")
+            print(f"  Sample count: {len(time_slice)}")
+            
+            time_slices.append(time_slice)
+            magnetization_slices.append(mag_slice)
             start = end
 
+        print("\n=== End Debug ===\n")
         return time_slices, magnetization_slices
     
 
