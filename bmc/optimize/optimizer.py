@@ -213,8 +213,6 @@ class DifferentiableBMCSimWrapper(nn.Module):
             _, _, _, _, m_trans = self.sim_engine.get_mag()
             signals.append(m_trans.abs())
 
-            
-        
         difference = torch.max(signals[0] - signals[1])
         return difference
 
