@@ -142,11 +142,19 @@ class SingleSimBMCWrapper(nn.Module):
                         block, current_adc, mag, counter
                     )
                 else:
-                    _, _, dtp_, delay_after_pulse = prep_rf_simulation(
+                    amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(
                         block, self.sim_engine.params.options["max_pulse_samples"]
                     )
                     
                     amp_params, phase_params = rf_params[rf_counter]
+                    
+                    if counter <= self.sim_engine.n_backlog:
+                        start_time = self.sim_engine.t[-1]
+                        self.sim_engine.events.append(f'rf at {start_time.item():.4f}s')
+                        time_array = start_time + torch.arange(1, amp_params.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
+                        self.sim_engine.time_sampling_size = torch.cat((self.sim_engine.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
+                        self.sim_engine.t = torch.cat((self.sim_engine.t, time_array))
+                    
                     for step_idx in range(amp_params.numel()):
                         self.sim_engine.bm_solver.update_matrix(
                             rf_amp=amp_params[step_idx],
@@ -207,7 +215,7 @@ class SingleSimBMCWrapper(nn.Module):
         # Magnetisierung abrufen und transversales Signal zurückgeben
         _, _, _, _, m_trans = self.sim_engine.get_mag()
         signal = m_trans.abs()
-        signal = torch.max(signal)
+        signal = torch.max(signal[40:])
         
         # Signal direkt zurückgeben (kein Maximum einer Differenz)
         return signal
