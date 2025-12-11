@@ -112,21 +112,21 @@ def plot_gradient_parameters(checkpoint: Dict):
     """
     grad_parameters = checkpoint['grad_parameters']
     
-    if grad_parameters is None:
+    if grad_parameters is None or len(grad_parameters) == 0:
         print("No gradient parameters found in checkpoint")
         return
         
-    # Convert to numpy for plotting
-    grad_parameters = grad_parameters.numpy()
-    
     # Plot for each gradient
-    num_gradients = grad_parameters.shape[0]
+    num_gradients = len(grad_parameters)
     fig, axes = plt.subplots(num_gradients, 1, figsize=(12, 4*num_gradients))
     if num_gradients == 1:
         axes = [axes]
     
     for i, grad in enumerate(grad_parameters):
-        axes[i].plot(grad, 'g-')
+        # Convert tensor to numpy for plotting
+        grad_np = grad.detach().cpu().numpy()
+        
+        axes[i].plot(grad_np, 'g-')
         axes[i].set_title(f'Gradient {i+1}')
         axes[i].set_xlabel('Sample')
         axes[i].set_ylabel('Amplitude')

@@ -10,12 +10,15 @@ import gc
 from bmc.simulate import simulate
 
 def _run_variation(seq_path_on: str, seq_path_off: str, config_path: str, adc_time: float, 
-                   z_pos: torch.Tensor, webhook: str, show_plot: bool) -> Tuple[Optional[int], Optional[float]]:
+                   z_pos: torch.Tensor, webhook: str, show_plot: bool, store_all: bool = False) -> Tuple[Optional[int], Optional[float]]:
     try:
         t_ex = 0
         match = re.search(r'\d+', seq_path_on)
         if match:
             t_ex = int(match.group())
+
+        # n_backlog bestimmt, ob alle Werte oder nur die letzten gespeichert werden
+        n_backlog = 'ALL' if store_all else 2
 
         # Annahme: simulate() gibt jetzt PyTorch Tensoren zurück
         sim_on = simulate(
@@ -26,7 +29,7 @@ def _run_variation(seq_path_on: str, seq_path_off: str, config_path: str, adc_ti
             return_zmag=False,
             iso_select=[0],
             show_plot=False,
-            n_backlog=2,
+            n_backlog=n_backlog,
             webhook=webhook,
             plt_range=None
         )
@@ -44,7 +47,7 @@ def _run_variation(seq_path_on: str, seq_path_off: str, config_path: str, adc_ti
             return_zmag=False,
             iso_select=[0],
             show_plot=False,
-            n_backlog=2,
+            n_backlog=n_backlog,
             webhook=webhook,
             plt_range=None
         )
@@ -80,7 +83,7 @@ def run_variation_helper(args):
 def run_variation(seq_path_on: List[str], seq_path_off: List[str], config_path: str, adc_time: float, 
                   z_pos: torch.Tensor, webhook: str, num_points: int = 2, batch_size: int = 10, 
                   max_processes: int = 4, save_path: str = "results.pt", save_to_file: bool = True, 
-                  show_plot: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+                  show_plot: bool = False, store_all: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
     
     assert len(seq_path_on) == len(seq_path_off), "Input lists must have the same length"
     
@@ -124,7 +127,8 @@ def run_variation(seq_path_on: List[str], seq_path_off: List[str], config_path: 
                         adc_time,
                         z_pos,
                         webhook,
-                        show_plot
+                        show_plot,
+                        store_all
                     ))
 
         if not args_list:
@@ -145,11 +149,20 @@ def run_variation(seq_path_on: List[str], seq_path_off: List[str], config_path: 
     t_ex, signal = zip(*results)
     return torch.tensor(t_ex), torch.tensor(signal)
 
-def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
+def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t, store_all: bool = False):
     """
     Führt eine Simulation durch und gibt je nach get_t entweder
     (t, m, m_plot) oder nur m zurück.
+    
+    Parameters
+    ----------
+    store_all : bool, optional
+        Wenn True, werden alle simulierten Werte gespeichert (n_backlog='ALL').
+        Wenn False (default), werden nur die letzten Werte gespeichert (n_backlog=2).
     """
+    # n_backlog bestimmt, ob alle Werte oder nur die letzten gespeichert werden
+    n_backlog = 'ALL' if store_all else 2
+    
     sim = simulate(
         config_file=config_path,
         seq_file=seq_path,
@@ -158,7 +171,7 @@ def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
         return_zmag=False,
         iso_select=[0],
         show_plot=False,
-        n_backlog=2, #2
+        n_backlog=n_backlog,
         webhook=webhook,
         plt_range=plt_range
     )
@@ -174,7 +187,16 @@ def run_sim(seq_path, config_path, adc_time, z_pos, webhook, plt_range, get_t):
     m = torch.abs(m_complex)
     return (t, m, m_plot) if get_t else m
 
-def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot, save_plot):
+def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_pos, webhook, show_plot, save_plot, store_all: bool = False):
+    """
+    Führt zwei Simulationen (on/off) parallel aus und berechnet das korrigierte Signal.
+    
+    Parameters
+    ----------
+    store_all : bool, optional
+        Wenn True, werden alle simulierten Werte gespeichert (n_backlog='ALL').
+        Wenn False (default), werden nur die letzten Werte gespeichert (n_backlog=2).
+    """
     # Extrahiere t_ex aus dem Dateinamen der on-Sequenz
     t_ex = 0
     match = re.search(r'\d+', seq_path_on)
@@ -186,10 +208,10 @@ def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_p
     pool = multiprocessing.Pool(processes=num_processes)
     
     async_on = pool.apply_async(
-        run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True)
+        run_sim, args=(seq_path_on, config_path, adc_time, z_pos, webhook, None, True, store_all)
     )
     async_off = pool.apply_async(
-        run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, True)
+        run_sim, args=(seq_path_off, config_path, adc_time, z_pos, webhook, None, True, store_all)
     )
     pool.close()
     pool.join()
@@ -208,22 +230,29 @@ def run_variation_parallel(seq_path_on, seq_path_off, config_path, adc_time, z_p
     signal_plot = [torch.abs(mp_on) - torch.abs(mp_off) for mp_on, mp_off in zip(m_plot_on, m_plot_off)]
     signal = torch.max(signal_corrected)
 
-    
-    fig, ax = plt.subplots(dpi=150)
+    # Konvertiere Daten für Plot zu numpy (CPU)
+    plot_data = {
+        't': [t_val.cpu().numpy() for t_val in t],
+        'signal_plot': [sp.cpu().numpy() for sp in signal_plot]
+    }
 
-    for index, t_val in enumerate(t):
-        ax.plot(t_val.cpu().numpy(), signal_plot[index].cpu().numpy(), 'o', markersize=1)
-    ax.axhline(0, c='black')
-    # ax.set_xlim(0.00, 0.005)
-    ax.set_ylim(-0.0008, 0.0003)
-    if show_plot:
-        plt.show()
-    if not show_plot:
-        plt.close(fig)
-    if save_plot:
-        fig.savefig(f"/Users/danielmiksch/Downloads/racete_0ppm.png", dpi=300, bbox_inches='tight')
+    fig = None
+    if show_plot or save_plot:
+        fig, ax = plt.subplots(dpi=150)
+
+        for index, t_val in enumerate(plot_data['t']):
+            ax.plot(t_val, plot_data['signal_plot'][index], 'o', markersize=1)
+        ax.axhline(0, c='black')
+        # ax.set_xlim(0.00, 0.005)
+        ax.set_ylim(-0.0008, 0.0003)
+        if show_plot:
+            plt.show()
+        if save_plot:
+            fig.savefig(f"/Users/danielmiksch/Downloads/racete_0ppm.png", dpi=300, bbox_inches='tight')
+        if not show_plot:
+            plt.close(fig)
 
     del m_on, m_off, signal_corrected, t
     gc.collect()
 
-    return t_ex, signal, fig
+    return t_ex, signal, plot_data
