@@ -425,7 +425,7 @@ class BMCSim(BMCTool):
         return self.t
     
 
-    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, **addParams) -> None:
+    def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, fan_surface: bool = False, fan_opacity: float = 0.6, show_vectors: bool = True, **addParams) -> None:
         """
         Animates the magnetization vector for all isochromats in a 3D plot.
         ----------
@@ -441,6 +441,16 @@ class BMCSim(BMCTool):
             Flag to activate interactive embedding, by default False
         timing: bool, optional
             Adds the current simulation time to the corner of the animation.
+        total_mag: bool, optional
+            If True, displays total magnetization vector, by default False
+        animate_cest: bool, optional
+            If True, animates CEST pool magnetization, by default False
+        fan_surface: bool, optional
+            If True, displays a colored fan-shaped surface connecting vector tips, by default False
+        fan_opacity: float, optional
+            Opacity of the fan surface, by default 0.6
+        show_vectors: bool, optional
+            If True, shows individual vectors along with fan surface, by default True
         """
 
         time = self.t[::step].cpu()
@@ -578,30 +588,82 @@ class BMCSim(BMCTool):
                         )
                 else:
 
+                    # Hilfsfunktion zum Erstellen der Fächerfläche
+                    def create_fan_surface(t_idx, scaling, cols, opacity):
+                        """Erstellt eine fächerförmige Fläche aus Dreiecken zwischen benachbarten Vektoren."""
+                        triangles = VGroup()
+                        origin = np.array([0.0, 0.0, 0.0])
+                        
+                        for i in range(isochromats - 1):
+                            # Vektorspitzen für benachbarte Isochromaten
+                            tip1 = np.array([
+                                m_vec_water[i, t_idx, 0] * scaling[0],
+                                m_vec_water[i, t_idx, 1] * scaling[1],
+                                m_vec_water[i, t_idx, 2] * scaling[2]
+                            ])
+                            tip2 = np.array([
+                                m_vec_water[i + 1, t_idx, 0] * scaling[0],
+                                m_vec_water[i + 1, t_idx, 1] * scaling[1],
+                                m_vec_water[i + 1, t_idx, 2] * scaling[2]
+                            ])
+                            
+                            # Dreieck vom Ursprung zu beiden Vektorspitzen
+                            triangle = Polygon(
+                                origin, tip1, tip2,
+                                fill_opacity=opacity,
+                                stroke_width=0.5,
+                                stroke_opacity=0.3
+                            )
+                            
+                            # Farbverlauf: Mischung der Farben beider benachbarter Vektoren
+                            triangle.set_fill(color=[cols[i], cols[i + 1]])
+                            triangle.set_stroke(color=cols[i])
+                            
+                            triangles.add(triangle)
+                        
+                        return triangles
+
+                    # Tracker für Vektoren initialisieren
                     for i in range(isochromats):
                         x_tracker = ValueTracker(m_vec_water[i, 0, 0] * scaling_array[0])
                         y_tracker = ValueTracker(m_vec_water[i, 0, 1] * scaling_array[1])
                         z_tracker = ValueTracker(m_vec_water[i, 0, 2] * scaling_array[2])
                         trackers.append((x_tracker, y_tracker, z_tracker))
 
-                        # Vektor erstellen
-                        vector = Vector(
-                            [x_tracker.get_value(), y_tracker.get_value(), z_tracker.get_value()],
-                            color=colors[i]
-                        )
+                        if show_vectors or not fan_surface:
+                            # Vektor erstellen
+                            vector = Vector(
+                                [x_tracker.get_value(), y_tracker.get_value(), z_tracker.get_value()],
+                                color=colors[i]
+                            )
 
-                        def update_vector(v, x=x_tracker, y=y_tracker, z=z_tracker, col=colors[i]):
-                            v.become(Vector([x.get_value(), y.get_value(), z.get_value()], color=col))
+                            def update_vector(v, x=x_tracker, y=y_tracker, z=z_tracker, col=colors[i]):
+                                v.become(Vector([x.get_value(), y.get_value(), z.get_value()], color=col))
 
-                        vector.add_updater(update_vector)
-                        vectors.append(vector)
+                            vector.add_updater(update_vector)
+                            vectors.append(vector)
 
-                        # Pfad hinzufügen, falls aktiviert
-                        if track_path:
-                            path = TracedPath(vector.get_end, stroke_color=colors[i], stroke_width=1)
-                            paths.append(path)
+                            # Pfad hinzufügen, falls aktiviert
+                            if track_path:
+                                path = TracedPath(vector.get_end, stroke_color=colors[i], stroke_width=1)
+                                paths.append(path)
 
-                    self.add(axes, labels, *vectors)
+                    # Fächerfläche erstellen, falls aktiviert
+                    if fan_surface and isochromats > 1:
+                        fan_group = create_fan_surface(0, scaling_array, colors, fan_opacity)
+                        time_index_tracker = ValueTracker(0)
+                        
+                        def update_fan(fg, tracker=time_index_tracker, scaling=scaling_array, cols=colors, opacity=fan_opacity):
+                            t_idx = int(tracker.get_value())
+                            new_fan = create_fan_surface(t_idx, scaling, cols, opacity)
+                            fg.become(new_fan)
+                        
+                        fan_group.add_updater(update_fan)
+                        self.add(fan_group)
+
+                    self.add(axes, labels)
+                    if show_vectors or not fan_surface:
+                        self.add(*vectors)
                     if track_path:
                         self.add(*paths)
 
@@ -624,18 +686,29 @@ class BMCSim(BMCTool):
 
                     # Animation über die Zeit
                     for t in range(1, len(time)):
-                        self.play(
-                            *[
+                        animations = []
+                        
+                        # Vektor-Animationen hinzufügen, wenn Vektoren angezeigt werden
+                        if show_vectors or not fan_surface:
+                            animations.extend([
                                 trackers[i][0].animate.set_value(m_vec_water[i, t, 0] * scaling_array[0]) for i in range(isochromats)
-                            ] + [
+                            ])
+                            animations.extend([
                                 trackers[i][1].animate.set_value(m_vec_water[i, t, 1] * scaling_array[1]) for i in range(isochromats)
-                            ] + [
+                            ])
+                            animations.extend([
                                 trackers[i][2].animate.set_value(m_vec_water[i, t, 2] * scaling_array[2]) for i in range(isochromats)
-                            ] + (
-                                [time_tracker.animate.set_value(t)] if timing else []
-                            ),
-                            run_time=run_time, rate_func=linear
-                        )
+                            ])
+                        
+                        # Fächerflächen-Animation hinzufügen
+                        if fan_surface and isochromats > 1:
+                            animations.append(time_index_tracker.animate.set_value(t))
+                        
+                        # Zeit-Animation hinzufügen
+                        if timing:
+                            animations.append(time_tracker.animate.set_value(t))
+                        
+                        self.play(*animations, run_time=run_time, rate_func=linear)
 
                 if ie:
                     self.interactive_embed()

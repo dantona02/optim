@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 06-Dec-2025 21:09:34
+# Created at: 15-Dec-2025 22:21:12
 
 [VERSION]
 major 1
@@ -69,13 +69,13 @@ seq_id_string 30phasead_animation
 # ..        Hz   ....     ....          ....    us   Hz   rad
 [RF]
 1      499.999 1 2 0 0 0 0
-2      166.666 1 2 0 0 0 3.14159
-3      166.666 1 2 0 0 0 6.28319
-4      166.666 1 2 0 0 0 9.42478
-5      166.666 1 2 0 0 0 12.5664
-6      166.666 1 2 0 0 0 15.708
-7      166.666 1 2 0 0 0 18.8496
-8      166.666 1 2 0 0 0 21.9911
+2      166.666 1 2 0 0 0 0
+3      166.666 1 2 0 0 0 3.14159
+4      166.666 1 2 0 0 0 6.28319
+5      166.666 1 2 0 0 0 9.42478
+6      166.666 1 2 0 0 0 12.5664
+7      166.666 1 2 0 0 0 15.708
+8      166.666 1 2 0 0 0 18.8496
 
 # Format of arbitrary gradients:
 #   time_shape_id of 0 means default timing (stepping with grad_raster starting at 1/2 of grad_raster)
@@ -2213,4 +2213,4 @@ num_samples 500
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 3cb46034e450c07224f80e335e22957a
+Hash 8ba022c1ef8d2cf9838649e25a7e03bc

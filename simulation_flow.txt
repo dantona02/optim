@@ -1,0 +1,444 @@
+================================================================================
+  SIMULATIONSFLOW — BMC Bloch-McConnell Simulation
+  Projekt: /Users/danielmiksch/JupyterLab/optim
+================================================================================
+
+Beteiligte Dateien (in Ausführungsreihenfolge):
+  simulate.py         → Einstiegspunkt
+  set_params.py       → Parameterladen aus YAML
+  params.py           → Params-Datenklasse
+  bmc_tool.py         → BMCTool-Basisklasse + Sequenz-Parsing + Pulse-Vorbereitung
+  fid/engine.py       → BMCSim (Erweiterung von BMCTool), Simulationsschleife
+  solver.py           → BlochMcConnellSolver (Matrixaufbau + Gleichungslösung)
+  sim_lib/config_1pool.yaml → Simulationsparameter (Pools, Scanner, Optionen)
+
+================================================================================
+PHASE 1 — EINSTIEG UND PARAMETERLADEN
+================================================================================
+
+Aufruf in simulate.py:
+  simulate(config_file, seq_file, z_positions, adc_time, iso_select, ...)
+
+Schritt 1.1 — Pfadvalidierung
+  - Überprüfung ob config_file und seq_file existieren (FileNotFoundError).
+
+Schritt 1.2 — load_params() in set_params.py
+  a) load_config(): Öffnet die YAML-Datei (z.B. config_1pool.yaml) mit yaml.load().
+     Das YAML enthält folgende Sektionen:
+       - water_pool: f, t1, t2  → werden intern zu r1=1/t1, r2=1/t2 umgerechnet
+       - cest_pool: (optional) pro Pool: f, t1, t2, k, dw
+       - b0, gamma, b0_inhom, rel_b1  → Scanner-Parameter
+       - verbose, reset_init_mag, scale, max_pulse_samples  → Sim-Optionen
+
+  b) check_params(): Validiert alle YAML-Werte gegen valid_params.yaml
+     (Typchecks, Pflichtfelder, gültige Lineshapes für MT).
+     t1/t2 werden automatisch in r1/r2 konvertiert.
+
+  c) Aufbau des Params-Objekts (params.py → Klasse Params):
+     - sp.set_scanner(b0, gamma, b0_inhom, rel_b1)
+       Intern gespeichert als:
+         scanner["b0"]               = 17 [T]
+         scanner["gamma"]            = 267.5153 [rad/uT]
+         scanner["b0_inhomogeneity"] = 0.0 [ppm]
+         scanner["rel_b1"]           = 1.0
+
+     - sp.set_options(verbose, reset_init_mag, max_pulse_samples, scale, par_calc)
+       max_pulse_samples = 200 (aus config)
+
+     - sp.set_water_pool(r1, r2, f)
+       water_pool["r1"] = 1/2.5 = 0.4 Hz
+       water_pool["r2"] = 1/0.071 ≈ 14.08 Hz
+       water_pool["f"]  = 1.0
+
+     - sp.set_cest_pool(...) (für jeden definierten CEST-Pool)
+       [In config_1pool.yaml auskommentiert → keine CEST-Pools aktiv]
+
+     - sp.set_m_vec():
+       Erstellt den initialen Magnetisierungsvektor M₀.
+
+       Struktur bei n_pools CEST-Pools (+ optionalem MT-Pool):
+         Größe = 3*(n_pools+1) [+ 1 für MT falls aktiv]
+
+       Reihenfolge des Vektors:
+         Index 0             : Mx_Wasser
+         Index 1..n_pools    : Mx_CEST₁..CESTₙ
+         Index n_pools+1     : My_Wasser
+         Index n_pools+2..   : My_CEST₁..CESTₙ
+         Index 2*(n_pools+1) : Mz_Wasser  ← mz_loc
+         Index 2*(n_pools+1)+1.. : Mz_CEST₁..CESTₙ
+         Index 3*(n_pools+1) : Mz_MT (falls aktiv)
+
+       Initialwerte: Mz_Wasser = f_Wasser * scale = 1.0
+                    Mz_CESTᵢ  = f_i * scale
+                    alle Mx, My = 0
+
+================================================================================
+PHASE 2 — INITIALISIERUNG DER SIMULATION
+================================================================================
+
+In simulate.py wird BMCSim instanziiert (fid/engine.py):
+  sim = BMCSim(adc_time, sim_params, seq_file, z_positions=z_positions, ...)
+
+Schritt 2.1 — BMCTool.__init__() (Basisklasse in bmc_tool.py)
+  - Liest die PyPulseq .seq-Datei: self.seq = pp.Sequence(); self.seq.read(seq_file)
+  - Liest Definitionen aus der Seq-Datei:
+      offsets_ppm  → Frequenzoffsets (ppm)
+      n_offsets    → Anzahl der Offsets
+      num_meas     → Anzahl der Messzeitpunkte
+  - Setzt m_init = params.m_vec (Kopie des Initialvektors)
+
+Schritt 2.2 — BMCSim.__init__() (fid/engine.py)
+  - z_positions: Positionen der Isochromaten [m] (räumliche Verteilung)
+  - n_isochromats = len(z_positions)
+
+  - Instanziiert BlochMcConnellSolver:
+    self.bm_solver = BlochMcConnellSolver(
+        params=params,
+        n_offsets=n_offsets,
+        z_positions=z_positions
+    )
+    → Löst Phase 3 aus (siehe unten)
+
+  - Berechnet dt_adc = adc_time / max_pulse_samples (Zeitschritt für ADC-Sampling)
+
+  - Initialisiert m_out:
+    Form: [n_isochromats, size, n_measure]
+    m_out[:, :, 0] = m_init (Startmagnetisierung für alle Isochromaten)
+
+================================================================================
+PHASE 3 — AUFBAU DES BLOCH-MCCONNELL-SOLVERS
+================================================================================
+
+BlochMcConnellSolver.__init__() in solver.py:
+
+Schritt 3.1 — update_params(params)
+  Berechnet die Larmorfrequenz:
+    w0 = b0 * gamma = 17 * 267.5153 ≈ 4547.76 rad/ms
+
+  Berechnet B0-Inhomogenität (dw0) für alle Isochromaten:
+    np.random.seed(42)  ← fixer Seed für Reproduzierbarkeit
+    dw0 = w0 * Normal(mean_ppm=0, sigma=b0_inhomogeneity, n_isochromats)
+    [Bei b0_inhomogeneity=0 → alle dw0 = 0]
+    → als torch.Tensor gespeichert
+
+Schritt 3.2 — _init_matrix_a()
+  Baut die statische Systemmatrix A auf (shape: [size × size]).
+  Diese enthält alle zeitunabhängigen Terme:
+
+  Diagonaleinträge (Relaxation + Austausch):
+    A[0,0]             = -R2_Wasser - Σ(k_ai)        (Mx-Wasser-Dämpfung)
+    A[n_p+1, n_p+1]   = -R2_Wasser - Σ(k_ai)        (My-Wasser-Dämpfung)
+    A[2*(n_p+1), ...]  = -R1_Wasser - k_ac - Σ(k_ai) (Mz-Wasser-Relaxation)
+    A[i+1, i+1]        = -(k_ia + R2_i)              (Mx-CESTᵢ-Dämpfung)
+    A[...MT...]        = -(R1_MT + k_MT)              (falls MT aktiv)
+
+  Off-Diagonaleinträge (chemischer Austausch zwischen Pools):
+    A[0, i+1]  = k_ia   (Übertrag Mx: CESTᵢ → Wasser)
+    A[i+1, 0]  = k_ai   (Übertrag Mx: Wasser → CESTᵢ)
+    (analog für My- und Mz-Blöcke)
+
+  Batching: Matrix wird auf 4D erweitert:
+    [n_isochromats, n_offsets, size, size]
+    → wenn par_calc=True: n_offsets Kopien entlang Dim 1
+    → sonst: shape [n_isochromats, 1, size, size]
+
+Schritt 3.3 — _init_vector_c()
+  Baut den Gleichgewichtsvektor C auf:
+    C[2*(n_p+1)]     = f_Wasser * R1_Wasser
+    C[2*(n_p+1)+i+1] = f_i * R1_i   (CEST-Pools)
+    C[3*(n_p+1)]     = f_MT * R1_MT  (falls MT aktiv)
+
+  Form: [n_isochromats, n_offsets, size, 1]
+
+================================================================================
+PHASE 4 — HAUPTSIMULATIONSSCHLEIFE
+================================================================================
+
+Aufruf: sim.run_fid() in fid/engine.py
+
+Schritt 4.1 — Initialisierung der Schleife
+  - Initialisierungsmagnetisierung:
+    mag = m_init als Tensor, Form: [1, 1, size, 1]  (wird auf alle Isochromaten gebrodcastet)
+  - Liest alle block_events aus der seq-Datei
+  - current_adc = 1 (Zähler für Ausgabe-Zeitpunkte)
+
+Schritt 4.2 — Schleife über alle Blöcke der Sequenz
+  for i, block_event in enumerate(block_events):
+    block = seq.get_block(block_event)
+    current_adc, mag = run_adc(block, current_adc, mag, counter)
+
+  Jeder Block wird in run_adc() nach Typ verzweigt:
+
+  ─────────────────────────────────────────────────────────────────
+  BLOCKTYP A: ADC-Block (block.adc is not None)
+  ─────────────────────────────────────────────────────────────────
+  Simuliert freie Präzession/Relaxation während des Auslesens:
+    dt_adc = adc_time / max_pulse_samples
+
+    for _ in range(max_pulse_samples):
+      bm_solver.update_matrix(rf_amp=0, rf_phase=0, rf_freq=0)
+        → A wird auf reine Relaxation/Präzession gesetzt (kein RF)
+      mag = bm_solver.solve_equation(mag, dtp=dt_adc)
+      m_out[:, :, current_adc] = mag   ← Magnetisierung gespeichert
+      current_adc += 1
+
+  ─────────────────────────────────────────────────────────────────
+  BLOCKTYP B: RF-Puls ohne Gradient (block.rf is not None)
+  ─────────────────────────────────────────────────────────────────
+  Vorbereitung in prep_rf_simulation() (bmc_tool.py):
+    1. Lese RF-Signal aus Sequenz: signal = rf.signal (komplex)
+    2. Berechne Gesamtpuls inkl. Phase-Offset und Frequenz-Offset:
+         w1_complex = signal * exp(j*phase_offset) * exp(j*2π*freq*t)
+    3. Amplitude: amp = |w1_complex|
+       Phase:     ph  = angle(w1_complex)
+    4. Resampling auf max_pulse_samples (200):
+       - Blockpuls (1 unique Wert)  → ein Sample, dtp = Pulsdauer
+       - Shaped Puls (>max_samples) → Downsampling (step-Faktor)
+       - Shaped Puls (<max_samples) → Lineare Interpolation mit np.interp
+                                      (Phase mit np.unwrap vor Interpolation)
+    5. delay_after_pulse = Stille am Ende des Pulses
+
+  Simulation:
+    for i in range(n_samples):
+      bm_solver.update_matrix(
+          rf_amp  = amp[i],          ← ω₁ = amp * 2π * rel_b1
+          rf_phase= ph[i],           ← Pulsphase
+          rf_freq = 0                ← Frequenzoffset (immer 0 in engine.py)
+      )
+      mag = bm_solver.solve_equation(mag, dtp=dtp_)
+
+    if delay_after_pulse > 0:
+      bm_solver.update_matrix(0, 0, 0)
+      mag = bm_solver.solve_equation(mag, dtp=delay_after_pulse)
+
+  ─────────────────────────────────────────────────────────────────
+  BLOCKTYP C: RF-Puls + Gradient gz (block.rf and block.gz)
+  ─────────────────────────────────────────────────────────────────
+  Analog zu Typ B, jedoch mit simultaner Gradientenamplitude:
+    prep_rf_simulation()  → amp_rf, ph_, dtp_rf
+    prep_grad_simulation() → amp_gz (resampled auf gleiche Länge)
+
+    Bedingung: len(amp_gz) == len(amp_rf)  (sonst Exception)
+
+    for i in range(n_samples):
+      bm_solver.update_matrix(
+          rf_amp   = amp_rf[i],
+          rf_phase = ph_[i],
+          rf_freq  = 0,
+          grad_amp = amp_gz[i]       ← Gradiententerm: 2π * G * z_position
+      )
+      mag = bm_solver.solve_equation(mag, dtp=dtp_rf)
+
+  ─────────────────────────────────────────────────────────────────
+  BLOCKTYP D: Nur Gradient gz (block.gz is not None)
+  ─────────────────────────────────────────────────────────────────
+  prep_grad_simulation() → amp_, dtp_, delay_after_grad
+    for i in range(n_samples):
+      bm_solver.update_matrix(0, 0, 0, grad_amp=amp_[i])
+        → Nur Gradientendephasing, kein RF
+      mag = bm_solver.solve_equation(mag, dtp=dtp_)
+
+  ─────────────────────────────────────────────────────────────────
+  BLOCKTYP E: Delay / reine Wartezeit
+  ─────────────────────────────────────────────────────────────────
+  Unterteilt in max_pulse_samples/10 Sub-Schritte:
+    dt_delay = delay / (max_pulse_samples/10)
+    for step in range(n_substeps):
+      bm_solver.update_matrix(0, 0, 0)
+      mag = bm_solver.solve_equation(mag, dtp=dt_delay)
+
+================================================================================
+PHASE 5 — KERN-SOLVER: update_matrix() + solve_equation()
+================================================================================
+
+Jeder Zeitschritt dt besteht aus zwei Aufrufen:
+
+─────────────────────────────────────────────────────────────────
+SCHRITT 5.1 — update_matrix() in solver.py
+─────────────────────────────────────────────────────────────────
+Aktualisiert die Systemmatrix A (clone von arr_a_static):
+
+  a) B0-Inhomogenitätsterme (anti-symmetrisch):
+     A[:,:, 0,    1+n_p] += -dw0 * j   (Mx→My-Kopplung Wasser)
+     A[:,:, 1+n_p, 0   ] +=  dw0 * j
+
+  b) Gradiententerme (pro Isochromat unterschiedlich):
+     grad_term = 2π * grad_amp * z_position[iso]
+     A[:,:, 0,    1+n_p] += +grad_term
+     A[:,:, 1+n_p, 0   ] += -grad_term
+     (analog für alle CEST-Pools)
+
+  c) RF-Terme (ω₁):
+     rf_amp_2pi = rf_amp * 2π * rel_b1
+     ω₁_sin = rf_amp_2pi * sin(rf_phase)
+     ω₁_cos = rf_amp_2pi * cos(rf_phase)
+
+     A[:,:, 0,          2*(n_p+1)] = -ω₁_sin   (Mx→Mz Wasser)
+     A[:,:, 2*(n_p+1),  0        ] = +ω₁_sin
+     A[:,:, n_p+1,      2*(n_p+1)] = +ω₁_cos   (My→Mz Wasser)
+     A[:,:, 2*(n_p+1),  n_p+1   ] = -ω₁_cos
+     (analog für alle CEST-Pools)
+
+  d) Off-Resonanz-Terme Wasser:
+     rf_freq_2pi = rf_freq * 2π
+     A[:,:, 0,    1+n_p] += +rf_freq_2pi
+     A[:,:, 1+n_p, 0   ] += -rf_freq_2pi
+
+  e) Off-Resonanz-Terme CEST-Pools:
+     dwi = dw_pool_i * w0 - (rf_freq_2pi + dw0)
+       (Differenz zwischen Pool-Offset und effektivem Wasseroffset)
+     A[:,:, i,     i+n_p+1] = -dwi
+     A[:,:, i+n_p+1, i    ] = +dwi
+
+  f) MT-Pool (falls aktiv):
+     Berechnet Lineshape-Funktion (Lorentzian / SuperLorentzian)
+     A[:,:, 3*(n_p+1), 3*(n_p+1)] =
+         -R1_MT - k_MT - ω₁² * MT_Lineshape(rf_freq + dw0, w0)
+
+  Ergebnis: new_arr_a hat Form [n_iso, n_off, size, size]
+    - Dimensional vollbesetzt, kein in-place Update (clone vorher)
+
+─────────────────────────────────────────────────────────────────
+SCHRITT 5.2 — solve_equation(mag, dtp) in solver.py
+─────────────────────────────────────────────────────────────────
+Löst das inhomogene lineare ODE-System für einen Zeitschritt dt:
+
+  dM/dt = A·M + C
+
+Analytische Lösung (exakt für konstantes A in [t, t+dt]):
+  M(t+dt) = exp(A·dt) · (M(t) + A⁺·C) - A⁺·C
+
+Implementierung:
+
+  1) Gleichgewichts-Verschiebung:
+     a_inv_t = pinv(A) @ C
+       [pinv statt inv, da A für rf_amp=0 singulär sein kann]
+       Form: [n_iso, n_off, size, 1]
+
+  2) Matrixexponential:
+     a_t = A * dt                         Form: [n_iso, n_off, size, size]
+     F   = torch.linalg.matrix_exp(a_t)  Form: [n_iso, n_off, size, size]
+       → Algorithmus: Optimiertes Taylor-Polynom (Bader, Blanes, Casas 2019)
+       → Vollständig differenzierbar (Fréchet-Ableitung für Autograd)
+       → Keine Anforderung an Diagonalisierbarkeit von A
+
+  3) Magnetisierungs-Propagation:
+     mag_new = F @ (mag + a_inv_t) - a_inv_t
+
+  4) Dimensionsbehandlung:
+     - Falls mag.ndim == 3 → unsqueeze(1) für n_offsets-Dim
+     - Falls par_calc=False und shape[1]==1 → squeeze(1) zurück
+
+  Rückgabe: mag_new als float64-Tensor
+    Form: [n_iso, n_off, size, 1] (par_calc=True)
+       oder [n_iso, size, 1]      (par_calc=False)
+
+================================================================================
+PHASE 6 — SPEICHERUNG DER ERGEBNISSE
+================================================================================
+
+  m_out[iso, komp, t_idx] = mag.squeeze()
+
+  Zugriff auf Ergebnisse nach run_fid() via get_mag():
+    m_x = m_out[:, 0,       :]   → Mx Wasser (alle Isochromaten, alle t)
+    m_y = m_out[:, n_p+1,   :]   → My Wasser
+    m_z = m_out[:, mz_loc,  :]   → Mz Wasser
+
+  Summe über Isochromaten (inkohärente Mittelung):
+    m_z_total = sum(m_z, dim=0) / n_isochromats
+
+  Ausgabe an simulate():
+    time, m_z, m_z_total, m_trans, m_trans_total
+
+================================================================================
+GESAMTÜBERBLICK: ALGORITHMEN-ABFOLGE (KOMPAKT)
+================================================================================
+
+  [YAML-Config]
+       |
+       v
+  load_params()          → Params-Objekt (Pools, Scanner, Optionen)
+       |
+       v
+  set_m_vec()            → M₀ = [0,..,0, f_w, f_cest1,..,f_MT]ᵀ
+       |
+       v
+  BMCSim.__init__()      → Sequenz laden, m_out allozieren
+       |
+       v
+  BlochMcConnellSolver() → A_stat, C aufbauen (Relaxation + Austausch)
+       |
+       v
+  run_fid()
+       |
+       ├── für jeden Block in seq:
+       │     │
+       │     ├── ADC   → für jeden Sub-Schritt dt_adc:
+       │     │               update_matrix(0,0,0)
+       │     │               solve_equation(mag, dt_adc)
+       │     │               → m_out speichern
+       │     │
+       │     ├── RF    → prep_rf_simulation() [Resampling]
+       │     │           für jeden Sample i:
+       │     │               update_matrix(amp[i], ph[i], freq)
+       │     │               solve_equation(mag, dtp)
+       │     │
+       │     ├── RF+GZ → prep_rf + prep_grad [co-resampled]
+       │     │           für jeden Sample i:
+       │     │               update_matrix(amp_rf[i], ph[i], 0, grad[i])
+       │     │               solve_equation(mag, dtp_rf)
+       │     │
+       │     ├── GZ    → nur Gradient, kein RF
+       │     │               update_matrix(0,0,0, grad[i])
+       │     │               solve_equation(mag, dtp)
+       │     │
+       │     └── Delay → update_matrix(0,0,0)
+       │                 solve_equation(mag, dt_delay)
+       │
+       v
+  get_mag()              → Mz, Mtrans pro Isochromat + Summe
+       |
+       v
+  [Ausgabe / Plot / Weiterverarbeitung]
+
+================================================================================
+TENSORFORMEN IM ÜBERBLICK
+================================================================================
+
+  self.arr_a    : [n_isochromats, n_offsets, size, size]
+  self.arr_c    : [n_isochromats, n_offsets, size, 1  ]
+  mag           : [n_isochromats, n_offsets, size, 1  ]  (par_calc=True)
+                  [n_isochromats, size,      1         ]  (par_calc=False)
+  m_out         : [n_isochromats, size, n_measure      ]
+
+  size = 3*(n_pools+1) [+ 1 für MT]
+    Bei 0 CEST-Pools, kein MT: size = 3
+
+================================================================================
+WICHTIGE IMPLEMENTIERUNGSHINWEISE
+================================================================================
+
+  1. B0-Inhomogenität (dw0):
+     - Wird einmalig in update_params() mit festem Seed (np.random.seed(42))
+       aus N(0, b0_inhomogeneity) gezogen → Reproduzierbarkeit garantiert
+     - Bei b0_inhomogeneity=0 (config_1pool.yaml): alle dw0 = 0
+
+  2. Autograd-Kompatibilität:
+     - torch.linalg.matrix_exp ist vollständig differenzierbar
+     - Kein torch.frexp, kein int()-Cast von Tensoren
+     - Alle Matrixoperationen in float64 → stabiler für Backprop
+
+  3. Keine in-place Operationen in update_matrix():
+     - new_arr_a = self.arr_a.clone() verhindert Autograd-Fehler
+     - Wichtig für Gradient-Berechnung im Optimierungsworkflow
+
+  4. par_calc Flag:
+     - True: alle Offsets simultan als Batch-Dimension verarbeitet
+     - False: sequenzieller Offset-Durchlauf (n_offsets-Dim = 1)
+     - Nur kompatibel mit reset_init_mag=True
+
+  5. Pseudo-Inverse statt Inverse:
+     - torch.linalg.pinv(A) für A⁺ · C
+     - Absicherung gegen Singularität (z.B. bei rf_amp=0, freie TRel.)
+
+================================================================================
