@@ -1,0 +1,48 @@
+# Pulseq sequence file
+# Created by PyPulseq
+
+# Created for Pulseq-CEST
+# https://pulseq-cest.github.io/
+# Created by: DANIEL MIKSCH
+# Created at: 27-Apr-2026 19:10:08
+
+[VERSION]
+major 1
+minor 4
+revision 2
+
+[DEFINITIONS]
+AdcRasterTime 1e-07 
+B0 17 
+BlockDurationRaster 1e-05 
+FREQ 723.7988 
+GradientRasterTime 1e-05 
+M0_offset 0.0 
+RadiofrequencyRasterTime 1e-06 
+TotalDuration 0.013 
+a 0.0 
+n_ETM 1 
+num_meas 1 
+offsets_ppm 0 
+seq_id_string fa_000 
+
+# Format of blocks:
+# NUM DUR RF  GX  GY  GZ  ADC  EXT
+[BLOCKS]
+1 200   0   0   0   0  0  0
+2 1000   0   0   0   0  0  0
+3 100   0   0   0   0  1  0
+
+# Format of ADC events:
+# id num dwell delay freq phase
+# ..  ..    ns    us   Hz   rad
+[ADC]
+1 1 1000000 0 0 0
+
+
+[SIGNATURE]
+# This is the hash of the Pulseq file, calculated right before the [SIGNATURE] section was added
+# It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
+# The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
+Type md5
+Hash a3d6d2a7cc758f3dda8ec39ddebd9e4a

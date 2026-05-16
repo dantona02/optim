@@ -95,13 +95,13 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
 
     # block pulse for seq-files >= 1.4.0
     if n_unique == 1 and amp.size(0) == 2:
-        amp_ = amp[0]
-        ph_ = ph[0]
+        amp_ = amp[0].unsqueeze(0)
+        ph_ = ph[0].unsqueeze(0)
         dtp_ = dtp
     # block pulse for seq-files < 1.4.0
     elif n_unique == 1:
-        amp_ = amp[0]
-        ph_ = ph[0]
+        amp_ = amp[0].unsqueeze(0)
+        ph_ = ph[0].unsqueeze(0)
         dtp_ = dtp * amp.size(0)
     # shaped pulse (Downsampling)
     elif n_unique > max_pulse_samples:
@@ -293,11 +293,11 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int, dtp_rf:
     # Analoge Logik wie in der Originalfunktion, um zwischen block pulse und shaped pulse zu unterscheiden
     if n_unique == 1 and amp.size(0) == 2:
         # block pulse für seq-files >= 1.4.0
-        amp_ = amp[0]
+        amp_ = amp[0].unsqueeze(0)
         dtp_ = dtp
     elif n_unique == 1:
         # block pulse für seq-files < 1.4.0
-        amp_ = amp[0]
+        amp_ = amp[0].unsqueeze(0)
         dtp_ = dtp * amp.size(0)
     elif n_unique > max_pulse_samples:
         # Downsampling (shaped pulse)

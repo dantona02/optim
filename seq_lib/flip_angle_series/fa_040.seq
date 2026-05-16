@@ -4,7 +4,7 @@
 # Created for Pulseq-CEST
 # https://pulseq-cest.github.io/
 # Created by: DANIEL MIKSCH
-# Created at: 20-Apr-2026 22:18:22
+# Created at: 27-Apr-2026 19:10:09
 
 [VERSION]
 major 1
@@ -20,11 +20,11 @@ GradientRasterTime 1e-05
 M0_offset 0.0 
 RadiofrequencyRasterTime 1e-06 
 TotalDuration 0.013 
-a 95 
+a 40.0 
 n_ETM 1 
 num_meas 1 
 offsets_ppm 0 
-seq_id_string 90 
+seq_id_string fa_040 
 
 # Format of blocks:
 # NUM DUR RF  GX  GY  GZ  ADC  EXT
@@ -37,7 +37,7 @@ seq_id_string 90
 # id amplitude mag_id phase_id time_shape_id delay freq phase
 # ..        Hz   ....     ....          ....    us   Hz   rad
 [RF]
-1      527.776 1 2 0 0 0 0
+1      222.222 1 2 0 0 0 0
 
 # Format of ADC events:
 # id num dwell delay freq phase
@@ -2051,4 +2051,4 @@ num_samples 2000
 # It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
 # The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
 Type md5
-Hash 10ef4993e674536412428ad4807aca58
+Hash a381e89ccec9427ce23c545dc6caff63

@@ -423,7 +423,26 @@ class BMCSim(BMCTool):
         Returns the time array.
         """
         return self.t
-    
+
+
+    def save_results(self, label: str = "sim", results_root=None):
+        """Save all raw simulation data to a timestamped directory under results/simulations/.
+
+        Parameters
+        ----------
+        label : str
+            Short human-readable label for the run, e.g. ``"fisp_30deg"``.
+        results_root : Path | str | None
+            Override the default results root directory.
+
+        Returns
+        -------
+        Path
+            Absolute path to the created output directory.
+        """
+        from bmc.utils.results import save_simulation
+        return save_simulation(self, label=label, results_root=results_root)
+
 
     def animate(self, step: int = 1, run_time=0.1, track_path=False, ie=False, timing=False, total_mag: bool = False, animate_cest: bool = False, fan_surface: bool = False, fan_opacity: float = 0.6, show_vectors: bool = True, **addParams) -> None:
         """
