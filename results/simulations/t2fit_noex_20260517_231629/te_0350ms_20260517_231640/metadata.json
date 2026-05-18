@@ -1,0 +1,15 @@
+{
+  "label": "te_0350ms",
+  "date": "2026-05-17T23:16:40.603571",
+  "seq_file": "/Users/danielmiksch/JupyterLab/optim/seq_lib/t2_fitting/t2fit_te_0350ms.seq",
+  "n_isochromats": 101,
+  "n_states": 6,
+  "n_timepoints": 641,
+  "adc_time": 0.05,
+  "n_backlog": 5,
+  "m_out_shape": [
+    101,
+    6,
+    641
+  ]
+}

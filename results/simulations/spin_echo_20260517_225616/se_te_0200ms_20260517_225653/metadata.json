@@ -1,0 +1,15 @@
+{
+  "label": "se_te_0200ms",
+  "date": "2026-05-17T22:56:54.117263",
+  "seq_file": "/Users/danielmiksch/JupyterLab/optim/seq_lib/spin_echo/se_te_0200ms.seq",
+  "n_isochromats": 1001,
+  "n_states": 6,
+  "n_timepoints": 1281,
+  "adc_time": 0.3,
+  "n_backlog": 5,
+  "m_out_shape": [
+    1001,
+    6,
+    1281
+  ]
+}

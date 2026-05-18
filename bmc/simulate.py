@@ -4,14 +4,137 @@ simulate.py
 """
 
 from pathlib import Path
-from typing import Union
+from typing import Tuple, Union
 import numpy as np
+import torch
+import pypulseq as pp
+from tqdm import tqdm
 
-from bmc.bmc_tool import BMCTool
+from bmc.bmc_tool import BMCTool, prep_rf_simulation
 from bmc.fid.engine import BMCSim
 from bmc.set_params import load_params
+from bmc.solver import BlochMcConnellSolver
 from bmc.utils.eval import plot_z, plot_sim
+from bmc.utils.global_device import GLOBAL_DEVICE
 
+
+def simulate_zspec(
+    config_file: Union[str, Path],
+    seq_file: Union[str, Path],
+    show_plot: bool = False,
+    norm_threshold: float = 295,
+    **kwargs,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Simulate a Z-spectrum from a saturation+ADC sequence.
+
+    Each repetition in the seq file must follow the pattern:
+        [RF saturation block] → [pseudo-ADC]
+
+    Magnetization is reset to thermal equilibrium after each ADC when
+    reset_init_mag is True in the config (default). If the first offset
+    is a far off-resonance M0 reference (|offset| > norm_threshold [ppm]),
+    the spectrum is normalized by that M0 value automatically.
+
+    Parameters
+    ----------
+    config_file : Union[str, Path]
+        Path to the YAML config file.
+    seq_file : Union[str, Path]
+        Path to the .seq file.
+    show_plot : bool, optional
+        Plot the Z-spectrum after simulation, by default False
+    norm_threshold : float, optional
+        Offsets beyond this [ppm] are treated as M0 reference, by default 295
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        (offsets_ppm, m_z) — offset array and normalized Mz values.
+    """
+    config_file = Path(config_file).resolve()
+    seq_file = Path(seq_file).resolve()
+
+    if not config_file.exists():
+        raise FileNotFoundError(f"Config file not found: {config_file}")
+    if not seq_file.exists():
+        raise FileNotFoundError(f"Seq file not found: {seq_file}")
+
+    params = load_params(config_file)
+
+    seq = pp.Sequence()
+    seq.read(seq_file)
+    try:
+        defs = seq.definitions
+        block_events = seq.block_events
+    except AttributeError:
+        defs = seq.dict_definitions
+        block_events = seq.dict_block_events
+
+    offsets_ppm = np.array(defs["offsets_ppm"])
+    n_offsets = offsets_ppm.size
+
+    solver = BlochMcConnellSolver(
+        params=params,
+        n_offsets=1,
+        z_positions=torch.tensor([0.0], dtype=torch.float64, device=GLOBAL_DEVICE),
+    )
+
+    m_init = params.m_vec.copy()
+    m_out = np.zeros([m_init.shape[0], n_offsets])
+
+    def _reset_mag() -> torch.Tensor:
+        return torch.tensor(
+            m_init[np.newaxis, np.newaxis, :, np.newaxis],
+            dtype=torch.float64, device=GLOBAL_DEVICE,
+        )
+
+    mag = _reset_mag()
+    current_adc = 0
+
+    for block_event in tqdm(block_events, desc="Z-spectrum"):
+        block = seq.get_block(block_event)
+
+        if block.adc is not None:
+            m_out[:, current_adc] = mag.squeeze().cpu().numpy()
+            current_adc += 1
+            if current_adc < n_offsets and params.options["reset_init_mag"]:
+                mag = _reset_mag()
+
+        elif block.rf is not None:
+            amp_, ph_, dtp_, delay_, rf_freq_ = prep_rf_simulation(
+                block, params.options["max_pulse_samples"]
+            )
+            for i in range(amp_.numel()):
+                solver.update_matrix(rf_amp=amp_[i], rf_phase=ph_[i], rf_freq=rf_freq_)
+                mag = solver.solve_equation(mag=mag, dtp=dtp_)
+            if delay_ > 0:
+                solver.update_matrix(0, 0, 0)
+                mag = solver.solve_equation(mag=mag, dtp=delay_)
+
+        elif block.gz is not None:
+            solver.update_matrix(0, 0, 0)
+            mag = solver.solve_equation(mag=mag, dtp=block.block_duration)
+            for j in range((len(params.cest_pools) + 1) * 2):
+                mag[0, 0, j, 0] = 0.0  # complete spoiling
+
+        elif hasattr(block, "block_duration") and block.block_duration != "0":
+            solver.update_matrix(0, 0, 0)
+            mag = solver.solve_equation(mag=mag, dtp=block.block_duration)
+
+    mz_loc = params.mz_loc
+    if n_offsets > 1 and abs(offsets_ppm[0]) >= norm_threshold:
+        m0 = m_out[mz_loc, 0]
+        offsets_out = offsets_ppm[1:]
+        m_z = np.abs(m_out[mz_loc, 1:]) / m0 if m0 != 0 else np.abs(m_out[mz_loc, 1:])
+    else:
+        offsets_out = offsets_ppm
+        m_z = np.abs(m_out[mz_loc, :])
+
+    if show_plot:
+        plot_z(m_z=m_z, offsets=offsets_out, **kwargs)
+
+    return offsets_out, m_z
 
 
 def simulate_(config_file: Union[str, Path], seq_file: Union[str, Path], show_plot: bool = False, **kwargs) -> BMCTool:

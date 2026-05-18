@@ -1,0 +1,15 @@
+{
+  "label": "fa_050",
+  "date": "2026-05-17T17:23:09.707619",
+  "seq_file": "/Users/danielmiksch/JupyterLab/optim/seq_lib/flip_angle_series/fa_050.seq",
+  "n_isochromats": 101,
+  "n_states": 6,
+  "n_timepoints": 401,
+  "adc_time": 1.0,
+  "n_backlog": 2,
+  "m_out_shape": [
+    101,
+    6,
+    401
+  ]
+}

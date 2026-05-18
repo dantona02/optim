@@ -1,0 +1,35 @@
+####################################################################################
+# ------ Simulation settings for Spin Echo experiments -------------------------- #
+# Same as config_1pool.yaml but with non-zero B0 inhomogeneity                   #
+# b0_inhom: 3.0e-8 -> sigma_dw0 ~ 136 rad/s ~ 22 Hz -> T2* ~ 10 ms              #
+####################################################################################
+
+### water pool
+water_pool: {
+  f: 1,
+  t1: 2.5,
+  t2: 0.071
+}
+
+# CEST
+cest_pool: {
+ 'amide': {
+   f: 0.00064865,
+   t1: 1.3,
+   t2: 0.1,
+   k: 0,
+   dw: 8
+  }
+}
+
+###### Scanner settings
+b0: 17
+gamma: 267.5153
+b0_inhom: 0.05
+rel_b1: 1
+
+##### Additional simulation settings
+verbose: False
+reset_init_mag: True
+scale: 1
+max_pulse_samples: 400

@@ -1,0 +1,30 @@
+####################################################################################
+# T2-Fitting — kein chemischer Austausch (k = 0)                                  #
+# b0_inhom: 3e-8 → T2* ≈ 10 ms (geeignet für Echo-Extraktion)                   #
+####################################################################################
+
+water_pool: {
+  f: 1,
+  t1: 2.5,
+  t2: 0.071
+}
+
+cest_pool: {
+ 'amide': {
+   f: 0.00064865,
+   t1: 1.3,
+   t2: 0.1,
+   k: 0,
+   dw: 8
+  }
+}
+
+b0: 17
+gamma: 267.5153
+b0_inhom: 3.0e-8
+rel_b1: 1
+
+verbose: False
+reset_init_mag: True
+scale: 1
+max_pulse_samples: 200

@@ -107,7 +107,7 @@ class BMCSim(BMCTool):
                     device=GLOBAL_DEVICE
                 )
                
-                src_for_scatter = mag.squeeze().unsqueeze(-1)
+                src_for_scatter = mag.reshape(new_m_out.size(0), new_m_out.size(1), 1)
 
                 new_m_out = new_m_out.scatter(dim=2, index=index_for_scatter, src=src_for_scatter)
                 new_current_adc += 1
@@ -157,7 +157,7 @@ class BMCSim(BMCTool):
 
         # RF pulse
         elif block.rf is not None:
-            amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
+            amp_, ph_, dtp_, delay_after_pulse, rf_freq_ = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
 
             if counter <= self.n_backlog:
                 start_time = self.t[-1]
@@ -165,12 +165,12 @@ class BMCSim(BMCTool):
                 time_array = start_time + torch.arange(1, amp_.numel() + 1, dtype=torch.float64, device=GLOBAL_DEVICE) * dtp_
                 self.time_sampling_size = torch.cat((self.time_sampling_size, torch.tensor([len(time_array)], device=GLOBAL_DEVICE)))
                 self.t = torch.cat((self.t, time_array))
-            
+
             for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
-                    rf_phase=ph_[i],  # statt -ph_[i] + block.rf.phase_offset - accum_phase
-                    rf_freq=0,                        # Frequenzoffset immer 0
+                    rf_phase=ph_[i],
+                    rf_freq=rf_freq_,  # block pulses: actual freq_offset; shaped: 0 (freq in phase)
                 )
                 
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=dtp_)

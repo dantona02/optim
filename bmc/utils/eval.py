@@ -290,14 +290,18 @@ def plot_sim(
 
     # Farbleiste zentriert bei 0
     center_idx = n_isochromats // 2
-    vmin, vcenter, vmax = -center_idx, 0, center_idx
-    norm = TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
+    if n_isochromats > 1:
+        vmin, vcenter, vmax = -center_idx, 0, center_idx
+        norm = TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
+        ticks = [-center_idx, 0, center_idx]
+    else:
+        norm = mcolors.Normalize(vmin=-1, vmax=1)
+        ticks = [0]
     sm = plt.cm.ScalarMappable(cmap=mcolors.ListedColormap(hex_colors), norm=norm)
     sm.set_array([])
 
     # Farbverlauf hinzufügen
     cbar = fig.colorbar(sm, ax=[ax1, ax2], orientation="horizontal", label=colorbar_label)
-    ticks = [-center_idx, 0, center_idx]
     cbar.set_ticks(ticks)
     cbar.ax.set_position([0.35, -5.3, 0.32, 5.2])
 

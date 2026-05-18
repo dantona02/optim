@@ -90,25 +90,34 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
     amp = amp_full
     ph = ph_full
 
-    # Wie in der Originalfunktion: Anzahl eindeutiger Amplituden- bzw. Phasenwerte
-    n_unique = max(len(torch.unique(amp)), len(torch.unique(ph)))
+    # Block pulse detection: use relative tolerance on amplitude to avoid float32
+    # precision loss in exp(j*2π*f*t) for large frequency offsets causing false
+    # "shaped pulse" classification of block pulses.
+    amp_range = float(amp_full.max() - amp_full.min())
+    amp_mean  = float(amp_full.mean())
+    is_const_amp = amp_range < 1e-3 * max(amp_mean, 1e-9)
+    n_unique_amp = 1 if is_const_amp else len(torch.unique(amp_full))
+    n_unique = max(n_unique_amp, len(torch.unique(ph)))
 
     # block pulse for seq-files >= 1.4.0
-    if n_unique == 1 and amp.size(0) == 2:
+    if n_unique_amp == 1 and amp.size(0) == 2:
         amp_ = amp[0].unsqueeze(0)
-        ph_ = ph[0].unsqueeze(0)
+        ph_ = ph[0].unsqueeze(0)  # phase at t=0 = phase_offset (freq contribution = 0)
         dtp_ = dtp
+        rf_freq_out = float(block.rf.freq_offset)
     # block pulse for seq-files < 1.4.0
-    elif n_unique == 1:
+    elif n_unique_amp == 1:
         amp_ = amp[0].unsqueeze(0)
         ph_ = ph[0].unsqueeze(0)
         dtp_ = dtp * amp.size(0)
+        rf_freq_out = float(block.rf.freq_offset)
     # shaped pulse (Downsampling)
     elif n_unique > max_pulse_samples:
         sample_factor = int(torch.ceil(torch.tensor(amp.size(0) / max_pulse_samples, device=GLOBAL_DEVICE)))
         amp_ = amp[::sample_factor]
         ph_ = ph[::sample_factor]
         dtp_ = dtp * sample_factor
+        rf_freq_out = 0.0  # freq already encoded in ph_ via w1_complex
     # shaped pulse (Interpolation auf max_pulse_samples)
     elif 1 < n_unique < max_pulse_samples:
         original_length = amp.size(0)
@@ -129,11 +138,12 @@ def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[
         ph_wrapped = (ph_interp + np.pi) % (2 * np.pi) - np.pi
         ph_ = torch.tensor(ph_wrapped, dtype=torch.float64, device=GLOBAL_DEVICE)
 
-        dtp_ = dtp * (original_length / max_pulse_samples)
+        dtp_ = dtp * (original_length - 1) / max_pulse_samples
+        rf_freq_out = 0.0  # freq already encoded in ph_ via w1_complex
     else:
         raise Exception("Unexpected case encountered in prep_rf_simulation_including_zeros.")
 
-    return amp_.to(dtype=torch.float64), ph_.to(dtype=torch.float64), dtp_, delay_after_pulse
+    return amp_.to(dtype=torch.float64), ph_.to(dtype=torch.float64), dtp_, delay_after_pulse, rf_freq_out
 
 
 # def prep_rf_simulation(block: SimpleNamespace, max_pulse_samples: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
@@ -311,7 +321,7 @@ def prep_grad_simulation(block: SimpleNamespace, max_pulse_samples: int, dtp_rf:
         amp_interp = F.interpolate(amp_unsq, size=max_pulse_samples, mode='linear', align_corners=True)
         amp_ = amp_interp.squeeze(0).squeeze(0)
         amp_ = amp_.to(GLOBAL_DEVICE)
-        dtp_ = dtp * (original_length / max_pulse_samples)
+        dtp_ = dtp * (original_length - 1) / max_pulse_samples
     else:
         raise Exception("Unexpected case encountered in prep_grad_simulation_including_zeros.")
 
@@ -378,7 +388,11 @@ class BMCTool:
         self.m_init = params.m_vec.copy()
         self.m_out = np.zeros([self.m_init.shape[0], self.n_measure])
 
-        #self.bm_solver = BlochMcConnellSolver(params=self.params, n_offsets=self.n_offsets, n_isochromats=1)
+        self.bm_solver = BlochMcConnellSolver(
+            params=self.params,
+            n_offsets=1,
+            z_positions=torch.tensor([0.0], dtype=torch.float64, device=GLOBAL_DEVICE),
+        )
 
     def update_params(self, params: Params) -> None:
         """
@@ -396,7 +410,10 @@ class BMCTool:
 
         current_adc = 0
         accum_phase = 0
-        mag = self.m_init[np.newaxis, :, np.newaxis]
+        mag = torch.tensor(
+            self.m_init[np.newaxis, np.newaxis, :, np.newaxis],
+            dtype=torch.float64, device=GLOBAL_DEVICE,
+        )  # shape [1, 1, size, 1]
 
         try:
             block_events = self.seq.block_events
@@ -418,21 +435,22 @@ class BMCTool:
                 block = self.seq.get_block(block_event)
                 current_adc, accum_phase, mag = self.run_1_3_0(block, current_adc, accum_phase, mag)
 
-    def run_1_4_0(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
+    def run_1_4_0(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, torch.Tensor]:
         # pseudo ADC event
         if block.adc is not None:
-            # write current magnetization to output
-            self.m_out[:, current_adc] = np.squeeze(mag)
+            self.m_out[:, current_adc] = mag.squeeze().cpu().numpy()
             accum_phase = 0
             current_adc += 1
-            # reset mag if this wasn't the last ADC event
             if current_adc <= self.n_offsets and self.params.options["reset_init_mag"]:
-                mag = self.m_init[np.newaxis, :, np.newaxis]
+                mag = torch.tensor(
+                    self.m_init[np.newaxis, np.newaxis, :, np.newaxis],
+                    dtype=torch.float64, device=GLOBAL_DEVICE,
+                )
 
         # RF pulse
         elif block.rf is not None:
-            amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
-            for i in range(amp_.size):
+            amp_, ph_, dtp_, delay_after_pulse, _ = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
+            for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
@@ -444,7 +462,7 @@ class BMCTool:
                 self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
-            phase_degree = dtp_ * amp_.size * 360 * block.rf.freq_offset
+            phase_degree = dtp_ * amp_.numel() * 360 * block.rf.freq_offset
             phase_degree %= 360
             accum_phase += phase_degree / 180 * np.pi
 
@@ -454,7 +472,7 @@ class BMCTool:
             self.bm_solver.update_matrix(0, 0, 0)
             mag = self.bm_solver.solve_equation(mag=mag, dtp=dur_)
             for j in range((len(self.params.cest_pools) + 1) * 2):
-                mag[0, j, 0] = 0.0  # assume complete spoiling
+                mag[0, 0, j, 0] = 0.0  # assume complete spoiling
 
         # delay or gradient(s) in x and/or y-direction
         elif hasattr(block, "block_duration") and block.block_duration != "0":
@@ -462,27 +480,27 @@ class BMCTool:
             self.bm_solver.update_matrix(0, 0, 0)
             mag = self.bm_solver.solve_equation(mag=mag, dtp=delay)
 
-        # this should not happen
         else:
             raise Exception("Unknown case")
 
         return current_adc, accum_phase, mag
 
-    def run_1_3_0(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, np.ndarray]:
+    def run_1_3_0(self, block, current_adc, accum_phase, mag) -> Tuple[int, float, torch.Tensor]:
         # pseudo ADC event
         if hasattr(block, "adc"):
-            # write current magnetization to output
-            self.m_out[:, current_adc] = np.squeeze(mag)
+            self.m_out[:, current_adc] = mag.squeeze().cpu().numpy()
             accum_phase = 0
             current_adc += 1
-            # reset mag if this wasn't the last ADC event
             if current_adc <= self.n_offsets and self.params.options["reset_init_mag"]:
-                mag = self.m_init[np.newaxis, :, np.newaxis]
+                mag = torch.tensor(
+                    self.m_init[np.newaxis, np.newaxis, :, np.newaxis],
+                    dtype=torch.float64, device=GLOBAL_DEVICE,
+                )
 
         # RF pulse
         elif hasattr(block, "rf"):
-            amp_, ph_, dtp_, delay_after_pulse = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
-            for i in range(amp_.size):
+            amp_, ph_, dtp_, delay_after_pulse, _ = prep_rf_simulation(block, self.params.options["max_pulse_samples"])
+            for i in range(amp_.numel()):
                 self.bm_solver.update_matrix(
                     rf_amp=amp_[i],
                     rf_phase=-ph_[i] + block.rf.phase_offset - accum_phase,
@@ -494,7 +512,7 @@ class BMCTool:
                 self.bm_solver.update_matrix(0, 0, 0)
                 mag = self.bm_solver.solve_equation(mag=mag, dtp=delay_after_pulse)
 
-            phase_degree = dtp_ * amp_.size * 360 * block.rf.freq_offset
+            phase_degree = dtp_ * amp_.numel() * 360 * block.rf.freq_offset
             phase_degree %= 360
             accum_phase += phase_degree / 180 * np.pi
 
@@ -504,7 +522,7 @@ class BMCTool:
             self.bm_solver.update_matrix(0, 0, 0)
             mag = self.bm_solver.solve_equation(mag=mag, dtp=dur_)
             for j in range((len(self.params.cest_pools) + 1) * 2):
-                mag[0, j, 0] = 0.0  # assume complete spoiling
+                mag[0, 0, j, 0] = 0.0  # assume complete spoiling
 
         # gradient in x and/or y-direction (handled as delay)
         elif hasattr(block, "gx") or hasattr(block, "gy"):
@@ -521,7 +539,6 @@ class BMCTool:
             self.bm_solver.update_matrix(0, 0, 0)
             mag = self.bm_solver.solve_equation(mag=mag, dtp=delay)
 
-        # this should not happen
         else:
             raise Exception("Unknown case")
 
