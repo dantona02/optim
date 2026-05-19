@@ -1,0 +1,15 @@
+{
+  "label": "cpmg",
+  "date": "2026-05-18T22:53:30.019588",
+  "seq_file": "/Users/danielmiksch/JupyterLab/optim/seq_lib/cpmg/cpmg_n8_te030ms_fa120.seq",
+  "n_isochromats": 1001,
+  "n_states": 6,
+  "n_timepoints": 2321,
+  "adc_time": 0.03,
+  "n_backlog": 26,
+  "m_out_shape": [
+    1001,
+    6,
+    2321
+  ]
+}

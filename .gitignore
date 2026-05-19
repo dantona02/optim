@@ -3,3 +3,7 @@
 *.pyc
 __pycache__/
 media/
+
+# NumPy simulation results
+*.npy
+*.npz

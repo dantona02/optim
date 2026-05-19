@@ -1,0 +1,195 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{lmodern}
+
+\geometry{margin=2.5cm}
+
+\title{Hahn-Train vs.\ CPMG: Why the First Echo Differs at Reduced Flip Angles}
+\author{Daniel Miksch}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Background}
+
+In a spin-echo experiment, a $90^\circ$ excitation pulse is followed by a train of refocusing
+pulses separated by the echo time $\mathrm{TE}$.  Two common phase conventions for the
+refocusing pulses are:
+
+\begin{itemize}
+  \item \textbf{Hahn-Train:} all refocusing pulses along the $x$-axis ($\varphi = 0$).
+  \item \textbf{CPMG} (Carr--Purcell--Meiboom--Gill): refocusing pulses along the $y$-axis
+        ($\varphi = \pi/2$), i.e.\ perpendicular to the initial magnetisation after the
+        $90^\circ_x$ excitation.
+\end{itemize}
+
+For a \emph{nominal} flip angle of $180^\circ$ both conventions produce identical echo
+amplitudes at every echo.  When the flip angle is reduced (e.g.\ to $120^\circ$ for SAR
+reduction), this equivalence is broken and the two sequences yield different amplitudes
+already at the \emph{first} echo.  This note explains why.
+
+\section{Symmetry Argument for the $180^\circ$ Case}
+
+After the $90^\circ_x$ pulse, equilibrium magnetisation $M_0\hat{z}$ is tipped to
+$+\hat{y}$:
+\begin{equation}
+  \mathbf{M}(0^+) = M_0\,\hat{y}.
+\end{equation}
+During the first $\mathrm{TE}/2$ delay, $B_0$ inhomogeneity causes the transverse
+magnetisation to dephase.  A spin at resonance offset $\Delta\omega$ accumulates phase
+$\varphi = \Delta\omega\cdot\mathrm{TE}/2$.
+
+A perfect $180^\circ$ refocusing pulse \emph{conjugates} the complex transverse
+magnetisation, i.e.\ $M_+ \mapsto M_-$, irrespective of whether the pulse axis is $x$
+or $y$ (since both axes are equivalent under the $180^\circ$ rotation group of the
+transverse plane).  After a further $\mathrm{TE}/2$ of free precession all isochromats
+rephase perfectly, giving the echo amplitude
+\begin{equation}
+  A_{\mathrm{echo}} = M_0\,e^{-\mathrm{TE}/T_2}.
+\end{equation}
+The phase axis ($x$ or $y$) is \textbf{irrelevant} for a $180^\circ$ pulse; the first
+echo amplitudes of the Hahn-Train and CPMG are therefore identical.
+
+\section{Breaking the Symmetry at $120^\circ$}
+
+For a flip angle $\alpha < 180^\circ$ the refocusing is imperfect, and the pulse axis
+matters because it determines \emph{which component} of the transverse magnetisation is
+inverted.  The effect of a pulse of flip angle $\alpha$ about a transverse axis at phase
+$\varphi_{\mathrm{pulse}}$ on the complex transverse magnetisation $M_+$ is
+\begin{equation}
+  M_+^{\,\prime}
+  = \cos^2\!\tfrac{\alpha}{2}\;M_+
+  + \sin^2\!\tfrac{\alpha}{2}\;M_-\,e^{2i\varphi_{\mathrm{pulse}}}
+  - i\,\sin\alpha\;M_z\,e^{i\varphi_{\mathrm{pulse}}}.
+  \label{eq:rotation}
+\end{equation}
+For $\alpha = 180^\circ$ Eq.~\eqref{eq:rotation} reduces to $M_+' = M_-\,e^{2i\varphi}$,
+which is perfect conjugation independent of $\varphi_{\mathrm{pulse}}$.  For
+$\alpha = 120^\circ$ the coefficients are
+\begin{equation}
+  \cos^2\!\tfrac{\alpha}{2} = \tfrac{1}{4}, \qquad
+  \sin^2\!\tfrac{\alpha}{2} = \tfrac{3}{4}, \qquad
+  \sin\alpha = \tfrac{\sqrt{3}}{2},
+\end{equation}
+and the pulse axis enters explicitly.
+
+\subsection{Analytical Echo Amplitudes}
+
+Assume the $B_0$ inhomogeneity produces a Gaussian distribution of resonance offsets
+with zero mean and standard deviation $\sigma_\omega$, so each spin accumulates phase
+$\varphi \sim \mathcal{N}(0,\,\sigma_\varphi^2)$ with
+$\sigma_\varphi = \sigma_\omega\cdot\mathrm{TE}/2$.  Neglecting $M_z$ recovery during
+$\mathrm{TE}$ (valid for $T_1 \gg \mathrm{TE}$) and assuming instantaneous pulses, the
+ensemble-averaged echo amplitude after the first refocusing pulse evaluates to
+
+\begin{align}
+  A_{\mathrm{Hahn}}^{(1)}  &= \left(\frac{3}{4} - \frac{h}{4}\right) M_0\,
+                               e^{-\mathrm{TE}/T_2}, \label{eq:hahn}\\[4pt]
+  A_{\mathrm{CPMG}}^{(1)}  &= \left(\frac{3}{4} + \frac{h}{4}\right) M_0\,
+                               e^{-\mathrm{TE}/T_2}, \label{eq:cpmg}
+\end{align}
+
+where the dephasing factor
+\begin{equation}
+  h = e^{-2\sigma_\varphi^2} = e^{-\sigma_\omega^2\,(\mathrm{TE}/2)^2/2 \cdot 4}
+    \;\in\; [0,\,1]
+\end{equation}
+measures how much coherence survives the first $\mathrm{TE}/2$ dephasing period.
+
+The two limiting cases are summarised in Table~\ref{tab:limits}.
+
+\begin{table}[h]
+  \centering
+  \caption{First-echo amplitude (in units of $M_0\,e^{-\mathrm{TE}/T_2}$) as a function
+           of dephasing strength for a $120^\circ$ refocusing pulse.}
+  \label{tab:limits}
+  \begin{tabular}{lccc}
+    \toprule
+    Dephasing regime & $h$ & $A_{\mathrm{Hahn}}^{(1)}$ & $A_{\mathrm{CPMG}}^{(1)}$ \\
+    \midrule
+    None\quad($\sigma_\varphi \to 0$) & $1$ & $1/2$ & $1$ \\
+    Intermediate & $(0,1)$ & $< 3/4$ & $> 3/4$ \\
+    Complete\quad($\sigma_\varphi \to \infty$) & $0$ & $3/4$ & $3/4$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Several observations follow directly:
+\begin{enumerate}
+  \item For \textbf{no dephasing} the CPMG pulse leaves $\mathbf{M}\!\parallel\!\hat{y}$
+        unchanged (rotation around its own direction), giving a full echo.  The Hahn pulse
+        projects $M_y \mapsto M_y\cos(120^\circ) = -M_y/2$, giving only half the amplitude.
+  \item For \textbf{complete dephasing} ($h\to 0$) both sequences converge to
+        $\tfrac{3}{4}M_0 e^{-\mathrm{TE}/T_2}$, the incoherent echo from an ensemble with
+        uniformly distributed phases.
+  \item For \textbf{any intermediate dephasing} the instantaneous-pulse model predicts
+        $A_{\mathrm{CPMG}}^{(1)} \geq A_{\mathrm{Hahn}}^{(1)}$.
+\end{enumerate}
+
+\section{Finite-Pulse Effects and the Simulation Result}
+
+Equations~\eqref{eq:hahn} and \eqref{eq:cpmg} assume \emph{instantaneous} refocusing
+pulses.  In the Bloch--McConnell simulation, all pulses have finite duration $\tau_p$.
+During the pulse, spins at offset $\Delta\omega$ continue to precess around $\hat{z}$ at
+rate $\Delta\omega$ in addition to the intended rotation around the pulse axis.  The
+effective rotation axis is tilted out of the transverse plane:
+\begin{equation}
+  \mathbf{B}_{\mathrm{eff}} = B_1\,\hat{n}_{\mathrm{pulse}} + \frac{\Delta\omega}{\gamma}\,\hat{z},
+  \qquad
+  \alpha_{\mathrm{eff}} = \gamma\,|\mathbf{B}_{\mathrm{eff}}|\,\tau_p
+               = \alpha_{\mathrm{nom}}\sqrt{1 + \left(\frac{\Delta\omega}{\gamma B_1}\right)^2}.
+\end{equation}
+
+For the \textbf{CPMG ($y$-axis) pulse}, the $z$-precession during the pulse mixes the
+$y$-component into the $x$--$z$ plane, directly undermining the y-component preservation
+that gives CPMG its advantage.  For the \textbf{Hahn ($x$-axis) pulse}, the $z$-precession
+interacts differently with the $x$-rotation, and the net effect is slightly less
+detrimental to the refocused echo.
+
+As a result, for the simulation parameters used here
+($B_0 = 17\,\mathrm{T}$, $b_0^\mathrm{inhom} = 0.05\,\mu\mathrm{T}$,
+$\mathrm{TE} = 30\,\mathrm{ms}$, $T_2 = 71\,\mathrm{ms}$, $\alpha = 120^\circ$) both
+echoes lie close to the large-dephasing limit
+$\tfrac{3}{4}\,M_0\,e^{-\mathrm{TE}/T_2} \approx 0.491$, but the Hahn first echo is
+marginally larger:
+
+\begin{center}
+\begin{tabular}{lcc}
+  \toprule
+  Sequence & Echo \#1 (simulated) & Deviation from $\tfrac{3}{4}\,e^{-\mathrm{TE}/T_2}$ \\
+  \midrule
+  Hahn-Train & $0.4740$ & $-3.5\,\%$ \\
+  CPMG       & $0.4571$ & $-6.9\,\%$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+The $3.7\,\%$ difference is a direct consequence of the broken symmetry at $120^\circ$
+combined with finite-pulse off-resonance effects.
+
+\section{Summary}
+
+\begin{itemize}
+  \item For $180^\circ$ refocusing pulses the Hahn-Train and CPMG produce
+        \textbf{identical first-echo amplitudes} by symmetry.
+  \item For any other flip angle (here $120^\circ$), the pulse axis breaks this symmetry:
+        the two sequences yield different first echoes.
+  \item In the \emph{ideal} (instantaneous-pulse) picture, CPMG gives a higher first echo
+        because it preserves the dominant $y$-magnetisation.  In practice, finite pulse
+        duration and $B_0$ inhomogeneity during the pulse reverse this advantage slightly.
+  \item The \textbf{clinically relevant advantage of CPMG} does not lie in the first echo
+        but in \emph{subsequent} echoes, where stimulated-echo coherence pathways
+        accumulate constructively, suppressing $T_2^*$ effects and giving a stable,
+        monotonically decaying echo train suitable for $T_2$ fitting.
+\end{itemize}
+
+\end{document}
