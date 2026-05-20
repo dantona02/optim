@@ -239,6 +239,7 @@ class Params:
         scale: float = 1.0,
         max_pulse_samples: int = 500,
         par_calc: bool = False,
+        isochromat_mode: str = "random",
     ) -> dict:
         """
         set_options Set all additional options
@@ -255,6 +256,9 @@ class Params:
             maximum number of simulation steps for one RF pulse, by default 500
         par_calc : bool, optional
             flag to activate parallel computation of all offsets (only available if reset_init_mag is True), by default False
+        isochromat_mode : str, optional
+            isochromat sampling strategy: "random" (Monte-Carlo, current default) or "deterministic"
+            (Shkarin & Spencer 1996, Eq. 23 — equally-spaced points with Gaussian PDF weights), by default "random"
 
         Returns
         -------
@@ -267,6 +271,7 @@ class Params:
             "scale": scale,
             "max_pulse_samples": max_pulse_samples,
             "par_calc": par_calc,
+            "isochromat_mode": isochromat_mode,
         }
         self.options.update(options)
         self._check_reset_init_mag()
@@ -286,7 +291,7 @@ class Params:
         AttributeError
             If an unknown parameter is given
         """
-        option_names = ["verbose", "reset_init_mag", "scale", "max_pulse_samples", "par_calc"]
+        option_names = ["verbose", "reset_init_mag", "scale", "max_pulse_samples", "par_calc", "isochromat_mode"]
 
         if not all(name in option_names for name in kwargs):
             raise AttributeError("Unknown option name. Update aborted!")

@@ -4,10 +4,10 @@
 
 # valid first order parameters
 valid_first: [ 'water_pool', 'mt_pool', 'cest_pool', 'cest_pools', 'b0', 'gamma', 'b0_inhom', 'b0_inhomogeneity',
-                'rel_b1', 'scale', 'reset_init_mag', 'max_pulse_samples', 'par_calc', 'verbose' ]
+                'rel_b1', 'scale', 'reset_init_mag', 'max_pulse_samples', 'par_calc', 'verbose', 'isochromat_mode' ]
 
 # valid parameters in first and second order of the dicts, sorted by type
-valid_str: ['lineshape', 'seq_file']
+valid_str: ['lineshape', 'seq_file', 'isochromat_mode']
 
 valid_num: ['f', 'r1', 'r2', 't1', 't2', 'k', 'dw', 'b0', 'gamma', 'b0_inhom', 'rel_b1', 'scale', 'max_pulse_samples']
 

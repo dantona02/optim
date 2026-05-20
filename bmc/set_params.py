@@ -278,7 +278,7 @@ def load_params(*filepaths: Union[str, Path]) -> Params:
         **{
             k: v
             for k, v in config.items()
-            if k in ["reset_init_mag", "max_pulse_samples", "scale", "par_calc", "verbose"]
+            if k in ["reset_init_mag", "max_pulse_samples", "scale", "par_calc", "verbose", "isochromat_mode"]
         }
     )
     # water pool settings

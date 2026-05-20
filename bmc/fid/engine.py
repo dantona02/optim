@@ -336,9 +336,11 @@ class BMCSim(BMCTool):
             m_y = self.m_out[:, n_total_pools + 1, :]
             m_z = self.m_out[:, self.params.mz_loc + 1, :]
 
-            m_x_total = torch.sum(m_x, dim=0)
-            m_y_total = torch.sum(m_y, dim=0)
-            m_z_total = torch.sum(m_z, dim=0)
+            weights = self.bm_solver.iso_weights.unsqueeze(1)  # [n_isochromats, 1]
+
+            m_x_total = (weights * m_x).sum(dim=0)
+            m_y_total = (weights * m_y).sum(dim=0)
+            m_z_total = (weights * m_z).sum(dim=0)
 
             norm_factor = torch.max(torch.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
 
@@ -359,15 +361,11 @@ class BMCSim(BMCTool):
             m_y = self.m_out[:, n_total_pools, :]
             m_z = self.m_out[:, self.params.mz_loc, :]
 
-            m_x_total = torch.sum(m_x, dim=0)
-            m_y_total = torch.sum(m_y, dim=0)
-            m_z_total = torch.sum(m_z, dim=0)
+            weights = self.bm_solver.iso_weights.unsqueeze(1)  # [n_isochromats, 1]
 
-            norm_factor = self.n_isochromats #torch.max(torch.sqrt(m_x_total**2 + m_y_total**2 + m_z_total**2))
-
-            m_z_total /= norm_factor if norm_factor != 0 else 1
-            m_x_total /= norm_factor if norm_factor != 0 else 1
-            m_y_total /= norm_factor if norm_factor != 0 else 1
+            m_x_total = (weights * m_x).sum(dim=0)
+            m_y_total = (weights * m_y).sum(dim=0)
+            m_z_total = (weights * m_z).sum(dim=0)
 
             m_trans_c = m_x + 1j * m_y
             m_trans_c_total = m_x_total + 1j * m_y_total

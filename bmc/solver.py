@@ -143,9 +143,32 @@ class BlochMcConnellSolver:
         self.params = params
         self.w0 = params.scanner["b0"] * params.scanner["gamma"]
 
-        np.random.seed(42)  # Fester Seed für Reproduzierbarkeit
-        self.dw0 = self.w0 * np.random.normal(self.mean_ppm, params.scanner["b0_inhomogeneity"], self.n_isochromats)
-        self.dw0 = torch.tensor(self.dw0, dtype=torch.float64, device=GLOBAL_DEVICE)
+        mode = params.options.get("isochromat_mode", "random")
+        sigma_ppm = params.scanner["b0_inhomogeneity"]
+
+        if mode == "deterministic":
+            L = 3.5
+            if self.n_isochromats == 1:
+                # 1-point rule: best estimate is the mean itself
+                v_k = np.array([self.mean_ppm])
+                w_k = np.ones(1)
+            else:
+                # Midpoint rule: centers of equal-width intervals, as per Shkarin & Spencer Eq. [23]
+                h = 2 * L / self.n_isochromats
+                v_k = self.mean_ppm + sigma_ppm * np.linspace(-L + h/2, L - h/2, self.n_isochromats)
+                if sigma_ppm > 0:
+                    w_k = np.exp(-0.5 * ((v_k - self.mean_ppm) / sigma_ppm) ** 2)
+                else:
+                    w_k = np.ones(self.n_isochromats)
+            self.iso_weights = torch.tensor(w_k / w_k.sum(), dtype=torch.float64, device=GLOBAL_DEVICE)
+            self.dw0 = torch.tensor(self.w0 * v_k, dtype=torch.float64, device=GLOBAL_DEVICE)
+        else:  # "random"
+            np.random.seed(42)
+            v_k = np.random.normal(self.mean_ppm, sigma_ppm, self.n_isochromats)
+            self.iso_weights = torch.full(
+                (self.n_isochromats,), 1.0 / self.n_isochromats, dtype=torch.float64, device=GLOBAL_DEVICE
+            )
+            self.dw0 = torch.tensor(self.w0 * v_k, dtype=torch.float64, device=GLOBAL_DEVICE)
         self._init_matrix_a()
         self._init_vector_c()
 
